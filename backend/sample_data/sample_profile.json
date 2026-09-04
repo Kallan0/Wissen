@@ -1,0 +1,99 @@
+{
+  "name": "Joji Developer",
+  "title": "Senior Full-Stack & Local AI Systems Engineer",
+  "contact": {
+    "email": "joji.dev@example.com",
+    "phone": "+1 (555) 345-6789",
+    "location": "Bengaluru, India / Remote",
+    "linkedin": "linkedin.com/in/jojidev",
+    "github": "github.com/jojidev",
+    "portfolio": "https://joji-portfolio.dev"
+  },
+  "summary": "Full-Stack Engineer with 5+ years of experience specializing in privacy-first local AI, high-throughput distributed backends, and modern Next.js/React web applications. Proven track record in orchestrating retrieval-augmented generation (RAG) pipelines with ChromaDB and Ollama, reducing external API dependencies while maintaining strict factual grounding.",
+  "skills": [
+    {
+      "category": "Languages & Core",
+      "items": ["Python", "TypeScript", "JavaScript", "Go", "C#", "SQL"]
+    },
+    {
+      "category": "Frontend & Web",
+      "items": ["Next.js", "React", "Tailwind CSS", "Redux Toolkit", "HTML5/CSS3", "Vite"]
+    },
+    {
+      "category": "Backend & Cloud",
+      "items": ["FastAPI", "Uvicorn", "Node.js", "Express", "PostgreSQL", "Redis", "Docker"]
+    },
+    {
+      "category": "AI, RAG & Vector DBs",
+      "items": ["ChromaDB", "LangChain", "Ollama", "FastEmbed", "Llama 3", "Prompt Engineering", "Semantic Search"]
+    }
+  ],
+  "experience": [
+    {
+      "company": "NeuralStack Labs",
+      "role": "Senior AI Systems & Full-Stack Engineer",
+      "duration": "2023 - Present",
+      "location": "Remote",
+      "technologies": ["FastAPI", "Next.js", "ChromaDB", "Ollama", "Python", "Tailwind CSS"],
+      "bullets": [
+        "Architected an on-premise, privacy-preserving Retrieval-Augmented Generation (RAG) platform using ChromaDB and local Ollama instances, eliminating recurring cloud LLM API costs.",
+        "Engineered asynchronous vector indexing endpoints capable of embedding and segmenting 50,000+ technical documents under 3 minutes.",
+        "Built responsive Next.js 14 dashboards with server-side rendering and streaming AI responses, achieving a 99 Lighthouse performance rating.",
+        "Implemented strict anti-hallucination guardrails and structured JSON schema validation to guarantee 100% factual accuracy against internal knowledge bases."
+      ]
+    },
+    {
+      "company": "CloudScale Technologies",
+      "role": "Full-Stack Software Engineer",
+      "duration": "2021 - 2023",
+      "location": "Bengaluru, India",
+      "technologies": ["Python", "FastAPI", "React", "TypeScript", "PostgreSQL", "Docker", "Redis"],
+      "bullets": [
+        "Developed and maintained 14+ RESTful microservices in Python (FastAPI) handling over 12 million daily transaction events with sub-40ms latency.",
+        "Designed and implemented distributed caching strategies using Redis, lowering relational database load by 55% during peak hours.",
+        "Collaborated with UX designers to refactor client-facing React web portals, improving core web vitals and customer conversion by 28%."
+      ]
+    },
+    {
+      "company": "AppMatrix Solutions",
+      "role": "Junior Backend Developer",
+      "duration": "2019 - 2021",
+      "location": "Bengaluru, India",
+      "technologies": ["Python", "Flask", "JavaScript", "MySQL", "Git"],
+      "bullets": [
+        "Created ETL data pipelines to ingest and normalize multi-source JSON and CSV datasets into relational databases.",
+        "Wrote unit and integration test suites boosting overall backend code coverage from 62% to 91%."
+      ]
+    }
+  ],
+  "projects": [
+    {
+      "name": "Local AI Resume Tailor",
+      "description": "Privacy-first offline resume generator utilizing local LLMs and vector search to align verified career milestones with job descriptions.",
+      "technologies": ["Next.js", "FastAPI", "ChromaDB", "Ollama", "Playwright"],
+      "highlights": [
+        "Automated semantic chunking and cosine similarity retrieval across candidate repositories, projects, and work history.",
+        "Integrated Playwright for automated headless browser generation of pixel-perfect A4/Letter PDF resumes with custom styling."
+      ],
+      "link": "https://github.com/jojidev/resume-builder"
+    },
+    {
+      "name": "Distributed Realtime Analytics Gateway",
+      "description": "High-concurrency streaming event pipeline processing telemetry data using WebSockets and Redis Pub/Sub.",
+      "technologies": ["Go", "Python", "FastAPI", "Redis", "Docker"],
+      "highlights": [
+        "Engineered zero-loss websocket listener processing 20,000 concurrent socket connections.",
+        "Built administrative telemetry monitoring dashboard with real-time charting and alerting."
+      ],
+      "link": "https://github.com/jojidev/analytics-gateway"
+    }
+  ],
+  "education": [
+    {
+      "institution": "Visvesvaraya Technological University",
+      "degree": "Bachelor of Engineering in Computer Science",
+      "year": "2019",
+      "details": "First Class with Distinction. Capstone: Distributed File Synchronization System."
+    }
+  ]
+}
