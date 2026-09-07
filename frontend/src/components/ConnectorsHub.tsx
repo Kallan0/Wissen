@@ -10,17 +10,31 @@ import {
   Sparkles,
   Layers,
   FileSearch,
+  ScrollText,
+  Stamp,
+  FileSpreadsheet,
+  FolderTree,
 } from "lucide-react";
-import { syncGitHub, syncCanvaProject, scanLocalProject } from "@/lib/api";
-import { GitHubSyncResult, FilesystemScanResult } from "@/lib/types";
+import { syncGitHub, syncCanvaProject, scanLocalProject, parseLinkedInCSV, scanVault } from "@/lib/api";
+import { GitHubSyncResult, FilesystemScanResult, VaultScanResult } from "@/lib/types";
 
 interface ConnectorsHubProps {
   onRefreshStats: () => void;
 }
 
 export default function ConnectorsHub({ onRefreshStats }: ConnectorsHubProps) {
-  const [activeSubTab, setActiveSubTab] = useState<"github" | "canva" | "creative">("github");
+  const [activeSubTab, setActiveSubTab] = useState<"github" | "canva" | "creative" | "linkedin" | "vault">("github");
   const [statusMessage, setStatusMessage] = useState<{ text: string; isError: boolean } | null>(null);
+
+  // LinkedIn State
+  const [linkedinPositionsCsv, setLinkedinPositionsCsv] = useState("");
+  const [linkedinSkillsCsv, setLinkedinSkillsCsv] = useState("");
+  const [parsingLinkedin, setParsingLinkedin] = useState(false);
+
+  // Vault State
+  const [vaultPath, setVaultPath] = useState("");
+  const [scanningVault, setScanningVault] = useState(false);
+  const [vaultResult, setVaultResult] = useState<VaultScanResult | null>(null);
 
   // GitHub State
   const [githubUser, setGithubUser] = useState("");
@@ -121,63 +135,77 @@ export default function ConnectorsHub({ onRefreshStats }: ConnectorsHubProps) {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100 mb-5">
+      {/* Editorial Header */}
+      <div className="bg-[#fffdf9] p-6 sm:p-8 rounded-xl border-2 border-ink shadow-dossier">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5 pb-5 border-b-2 border-ink/20 mb-6">
           <div>
-            <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-              <Layers className="w-5 h-5 text-indigo-600" />
-              Data Connectors & Integrations
+            <div className="flex items-center gap-2 mb-1">
+              <span className="font-mono text-[11px] uppercase tracking-widest bg-ink text-paper px-2 py-0.5 font-bold">
+                INTEGRATION DOCKET
+              </span>
+              <span className="font-mono text-[11px] text-ink-muted uppercase tracking-wider">
+                EXTERNAL ARCHIVES // CRAWLERS
+              </span>
+            </div>
+            <h2 className="text-2xl sm:text-3xl font-serif font-bold text-ink tracking-tight flex items-center gap-2.5">
+              <Layers className="w-6 h-6 text-terracotta" />
+              Creative Connectors & Repository Sync
             </h2>
-            <p className="text-sm text-slate-500 mt-1">
-              Connect your external and local creative workspaces (GitHub, Canva / Figma, Unity / Blender folders) to automatically populate your ChromaDB vector knowledge base.
+            <p className="text-xs sm:text-sm font-serif italic text-ink-muted mt-1 max-w-2xl leading-relaxed">
+              Connect external and local creative archives (GitHub, Canva / Figma portfolios, Unity / Blender project directories) to automatically populate your ChromaDB vector ledger.
             </p>
           </div>
 
           {/* Subtabs */}
-          <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-lg border border-slate-200">
+          <div className="flex flex-wrap items-center gap-1.5 bg-manila p-1.5 rounded-lg border-2 border-ink shrink-0">
             <button
               onClick={() => setActiveSubTab("github")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition ${
-                activeSubTab === "github" ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:text-slate-900"
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded font-mono text-xs font-bold transition-all ${
+                activeSubTab === "github"
+                  ? "bg-terracotta text-paper shadow-press"
+                  : "text-ink hover:text-terracotta"
               }`}
             >
               <Github className="w-3.5 h-3.5" />
-              GitHub
+              [01] GitHub
             </button>
             <button
               onClick={() => setActiveSubTab("canva")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition ${
-                activeSubTab === "canva" ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:text-slate-900"
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded font-mono text-xs font-bold transition-all ${
+                activeSubTab === "canva"
+                  ? "bg-terracotta text-paper shadow-press"
+                  : "text-ink hover:text-terracotta"
               }`}
             >
-              <Palette className="w-3.5 h-3.5 text-pink-600" />
-              Canva / UI-UX
+              <Palette className="w-3.5 h-3.5" />
+              [02] Canva / Design
             </button>
             <button
               onClick={() => setActiveSubTab("creative")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition ${
-                activeSubTab === "creative" ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:text-slate-900"
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded font-mono text-xs font-bold transition-all ${
+                activeSubTab === "creative"
+                  ? "bg-terracotta text-paper shadow-press"
+                  : "text-ink hover:text-terracotta"
               }`}
             >
-              <Boxes className="w-3.5 h-3.5 text-blue-600" />
-              Unity / Blender
+              <Boxes className="w-3.5 h-3.5" />
+              [03] Local Workspace
             </button>
           </div>
         </div>
 
         {statusMessage && (
           <div
-            className={`p-3 rounded-lg border text-xs flex items-center gap-2 mb-4 ${
+            className={`p-4 rounded-lg border-2 font-mono text-xs flex items-center gap-2 mb-6 shadow-press ${
               statusMessage.isError
-                ? "bg-red-50 border-red-200 text-red-700"
-                : "bg-emerald-50 border-emerald-200 text-emerald-800"
+                ? "bg-[#fff0ed] border-terracotta text-terracotta"
+                : "bg-paper border-ink text-ink"
             }`}
           >
             {statusMessage.isError ? (
-              <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
+              <AlertCircle className="w-4 h-4 text-terracotta shrink-0" />
             ) : (
-              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              <CheckCircle2 className="w-4 h-4 text-fountain-teal shrink-0" />
             )}
             <span>{statusMessage.text}</span>
           </div>
@@ -185,68 +213,70 @@ export default function ConnectorsHub({ onRefreshStats }: ConnectorsHubProps) {
 
         {/* --- GITHUB CONNECTOR TAB --- */}
         {activeSubTab === "github" && (
-          <div className="space-y-5">
-            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
-              <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2 mb-1">
-                <Github className="w-4 h-4 text-slate-800" />
-                Sync Public GitHub Repositories
+          <div className="space-y-6">
+            <div className="bg-manila/40 p-5 rounded-xl border-2 border-ink shadow-press">
+              <h3 className="font-serif text-base font-bold text-ink flex items-center gap-2 mb-1">
+                <Github className="w-4 h-4 text-terracotta" />
+                Sync Public GitHub Repositories & READMEs
               </h3>
-              <p className="text-xs text-slate-500 mb-4">
+              <p className="font-serif italic text-xs text-ink-muted mb-4">
                 Pulls all your public repositories, star counts, programming languages, and README summaries directly into ChromaDB.
               </p>
 
               <form onSubmit={handleGithubSync} className="space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">GitHub Username</label>
+                    <label className="block font-mono text-[11px] font-bold text-ink mb-1 uppercase tracking-wider">
+                      GitHub Username
+                    </label>
                     <input
                       type="text"
                       placeholder="e.g. your_github_username"
                       value={githubUser}
                       onChange={(e) => setGithubUser(e.target.value)}
                       required
-                      className="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg bg-white"
+                      className="w-full font-mono text-xs px-3 py-2 border-2 border-ink rounded bg-[#fffdf9] text-ink focus:outline-none focus:ring-2 focus:ring-terracotta"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">
-                      Personal Access Token <span className="text-slate-400 font-normal">(Optional, for higher rate limits)</span>
+                    <label className="block font-mono text-[11px] font-bold text-ink mb-1 uppercase tracking-wider">
+                      Personal Access Token <span className="text-ink-muted font-normal">(Optional, for higher rate limits)</span>
                     </label>
                     <input
                       type="password"
                       placeholder="ghp_xxxxxxxxxxxx"
                       value={githubToken}
                       onChange={(e) => setGithubToken(e.target.value)}
-                      className="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg bg-white font-mono"
+                      className="w-full font-mono text-xs px-3 py-2 border-2 border-ink rounded bg-[#fffdf9] text-ink focus:outline-none focus:ring-2 focus:ring-terracotta"
                     />
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between">
-                  <label className="flex items-center gap-2 text-xs text-slate-600 cursor-pointer">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
+                  <label className="flex items-center gap-2 font-serif text-xs text-ink cursor-pointer">
                     <input
                       type="checkbox"
                       checked={fetchReadme}
                       onChange={(e) => setFetchReadme(e.target.checked)}
-                      className="rounded text-blue-600"
+                      className="rounded text-terracotta border-ink focus:ring-terracotta"
                     />
-                    <span>Fetch and summarize repository README files for rich detail</span>
+                    <span>Fetch and summarize repository README markdown for deep RAG ingestion</span>
                   </label>
 
                   <button
                     type="submit"
                     disabled={syncingGithub}
-                    className="inline-flex items-center gap-1.5 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-lg shadow transition disabled:opacity-50"
+                    className="inline-flex items-center gap-2 px-5 py-2.5 bg-terracotta hover:bg-[#b03d25] text-paper font-mono font-bold text-xs uppercase tracking-wider rounded-lg border-2 border-ink shadow-press hover:translate-x-[1px] hover:translate-y-[1px] transition-all disabled:opacity-50"
                   >
                     {syncingGithub ? (
                       <>
-                        <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                        Fetching & Indexing Repositories...
+                        <div className="w-3.5 h-3.5 border-2 border-paper border-t-transparent rounded-full animate-spin" />
+                        INDEXING REPOSITORIES...
                       </>
                     ) : (
                       <>
                         <Sparkles className="w-3.5 h-3.5" />
-                        Sync GitHub to ChromaDB
+                        SYNC GITHUB TO CHROMADB
                       </>
                     )}
                   </button>
@@ -256,19 +286,19 @@ export default function ConnectorsHub({ onRefreshStats }: ConnectorsHubProps) {
 
             {/* Results Grid */}
             {githubResult && (
-              <div className="border border-slate-200 rounded-xl p-4 bg-white space-y-3">
-                <div className="flex items-center justify-between text-xs font-bold text-slate-800 border-b pb-2">
-                  <span>Synced Repositories ({githubResult.repos_synced})</span>
-                  <span className="text-indigo-600">{githubResult.skills_extracted} Skills Extracted</span>
+              <div className="border-2 border-ink rounded-xl p-5 bg-[#fffdf9] shadow-press space-y-3">
+                <div className="flex items-center justify-between font-mono text-xs font-bold text-ink border-b-2 border-ink/20 pb-2">
+                  <span>SYNCED REPOSITORIES ({githubResult.repos_synced})</span>
+                  <span className="text-terracotta">{githubResult.skills_extracted} SKILLS EXTRACTED</span>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 max-h-60 overflow-y-auto pr-1">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 max-h-60 overflow-y-auto pr-1">
                   {githubResult.repositories.map((repo, idx) => (
-                    <div key={idx} className="p-2.5 bg-slate-50 rounded-lg border border-slate-200 text-xs">
-                      <div className="flex items-center justify-between font-bold text-slate-800">
+                    <div key={idx} className="p-3 bg-paper rounded border-2 border-ink/20 font-serif text-xs">
+                      <div className="flex items-center justify-between font-bold text-ink">
                         <span className="truncate">{repo.name}</span>
-                        <span className="text-amber-600 font-normal text-[11px] shrink-0">★ {repo.stars}</span>
+                        <span className="font-mono text-vintage-gold font-bold text-[11px] shrink-0">★ {repo.stars}</span>
                       </div>
-                      <div className="text-[11px] text-slate-500 mt-1">Lang: {repo.language}</div>
+                      <div className="font-mono text-[10px] text-ink-muted mt-1">LANG: {repo.language}</div>
                     </div>
                   ))}
                 </div>
@@ -279,33 +309,37 @@ export default function ConnectorsHub({ onRefreshStats }: ConnectorsHubProps) {
 
         {/* --- CANVA / UI-UX DESIGN CONNECTOR TAB --- */}
         {activeSubTab === "canva" && (
-          <div className="bg-slate-50 p-5 rounded-xl border border-slate-200 space-y-4">
-            <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2 mb-1">
-              <Palette className="w-4 h-4 text-pink-600" />
+          <div className="bg-manila/40 p-5 rounded-xl border-2 border-ink shadow-press space-y-4">
+            <h3 className="font-serif text-base font-bold text-ink flex items-center gap-2 mb-1">
+              <Palette className="w-4 h-4 text-terracotta" />
               Canva & UI/UX Design Project Ingestor
             </h3>
-            <p className="text-xs text-slate-500 mb-3">
+            <p className="font-serif italic text-xs text-ink-muted mb-3">
               Export design metadata from Canva, Figma, or your design portfolio. Embeds creative case studies, tools, prototypes, and user metrics into your vector database.
             </p>
 
-            <form onSubmit={handleCanvaSync} className="space-y-3">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <form onSubmit={handleCanvaSync} className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="sm:col-span-2">
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Project / Case Study Title</label>
+                  <label className="block font-mono text-[11px] font-bold text-ink mb-1 uppercase tracking-wider">
+                    Project / Case Study Title
+                  </label>
                   <input
                     type="text"
                     value={canvaTitle}
                     onChange={(e) => setCanvaTitle(e.target.value)}
                     required
-                    className="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg bg-white"
+                    className="w-full font-mono text-xs px-3 py-2 border-2 border-ink rounded bg-[#fffdf9] text-ink focus:outline-none focus:ring-2 focus:ring-terracotta"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Design Discipline</label>
+                  <label className="block font-mono text-[11px] font-bold text-ink mb-1 uppercase tracking-wider">
+                    Design Discipline
+                  </label>
                   <select
                     value={canvaType}
                     onChange={(e) => setCanvaType(e.target.value)}
-                    className="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg bg-white"
+                    className="w-full font-mono text-xs px-3 py-2 border-2 border-ink rounded bg-[#fffdf9] text-ink focus:outline-none focus:ring-2 focus:ring-terracotta"
                   >
                     <option value="UI/UX & Design System">UI/UX & Design System</option>
                     <option value="Visual & Brand Identity">Visual & Brand Identity</option>
@@ -316,58 +350,68 @@ export default function ConnectorsHub({ onRefreshStats }: ConnectorsHubProps) {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Project Description & Overview</label>
+                <label className="block font-mono text-[11px] font-bold text-ink mb-1 uppercase tracking-wider">
+                  Project Description & Overview
+                </label>
                 <textarea
                   rows={3}
                   value={canvaDesc}
                   onChange={(e) => setCanvaDesc(e.target.value)}
                   required
-                  className="w-full text-xs p-2.5 border border-slate-300 rounded-lg bg-white"
+                  className="w-full font-mono text-xs p-3 border-2 border-ink rounded bg-[#fffdf9] text-ink focus:outline-none focus:ring-2 focus:ring-terracotta"
                 />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Creative Tools Used</label>
+                  <label className="block font-mono text-[11px] font-bold text-ink mb-1 uppercase tracking-wider">
+                    Creative Tools Used
+                  </label>
                   <input
                     type="text"
                     value={canvaTools}
                     onChange={(e) => setCanvaTools(e.target.value)}
                     placeholder="Canva, Figma, Blender, Adobe Illustrator"
-                    className="w-full text-xs px-3 py-1.5 border border-slate-300 rounded-lg bg-white"
+                    className="w-full font-mono text-xs px-3 py-2 border-2 border-ink rounded bg-[#fffdf9] text-ink focus:outline-none focus:ring-2 focus:ring-terracotta"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Prototype / Portfolio URL</label>
+                  <label className="block font-mono text-[11px] font-bold text-ink mb-1 uppercase tracking-wider">
+                    Prototype / Portfolio URL
+                  </label>
                   <input
                     type="url"
                     value={canvaUrl}
                     onChange={(e) => setCanvaUrl(e.target.value)}
                     placeholder="https://canva.com/design/..."
-                    className="w-full text-xs px-3 py-1.5 border border-slate-300 rounded-lg bg-white"
+                    className="w-full font-mono text-xs px-3 py-2 border-2 border-ink rounded bg-[#fffdf9] text-ink focus:outline-none focus:ring-2 focus:ring-terracotta"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Key Deliverables</label>
+                  <label className="block font-mono text-[11px] font-bold text-ink mb-1 uppercase tracking-wider">
+                    Key Deliverables
+                  </label>
                   <input
                     type="text"
                     value={canvaDeliverables}
                     onChange={(e) => setCanvaDeliverables(e.target.value)}
                     placeholder="User Personas, High-Fidelity Mockups, Design Tokens"
-                    className="w-full text-xs px-3 py-1.5 border border-slate-300 rounded-lg bg-white"
+                    className="w-full font-mono text-xs px-3 py-2 border-2 border-ink rounded bg-[#fffdf9] text-ink focus:outline-none focus:ring-2 focus:ring-terracotta"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Quantifiable Impact / Metrics</label>
+                  <label className="block font-mono text-[11px] font-bold text-ink mb-1 uppercase tracking-wider">
+                    Quantifiable Impact / Metrics
+                  </label>
                   <input
                     type="text"
                     value={canvaImpact}
                     onChange={(e) => setCanvaImpact(e.target.value)}
                     placeholder="e.g. Increased checkout completion by 22%"
-                    className="w-full text-xs px-3 py-1.5 border border-slate-300 rounded-lg bg-white"
+                    className="w-full font-mono text-xs px-3 py-2 border-2 border-ink rounded bg-[#fffdf9] text-ink focus:outline-none focus:ring-2 focus:ring-terracotta"
                   />
                 </div>
               </div>
@@ -376,9 +420,9 @@ export default function ConnectorsHub({ onRefreshStats }: ConnectorsHubProps) {
                 <button
                   type="submit"
                   disabled={syncingCanva}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-pink-600 hover:bg-pink-700 text-white text-xs font-semibold rounded-lg shadow transition disabled:opacity-50"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-terracotta hover:bg-[#b03d25] text-paper font-mono font-bold text-xs uppercase tracking-wider rounded-lg border-2 border-ink shadow-press hover:translate-x-[1px] hover:translate-y-[1px] transition-all disabled:opacity-50"
                 >
-                  {syncingCanva ? "Indexing Design Case Study..." : "Index Design Project to ChromaDB"}
+                  {syncingCanva ? "INDEXING DESIGN CASE STUDY..." : "INDEX DESIGN PROJECT TO CHROMADB"}
                 </button>
               </div>
             </form>
@@ -388,55 +432,59 @@ export default function ConnectorsHub({ onRefreshStats }: ConnectorsHubProps) {
         {/* --- CREATIVE / GAME ENGINE FILESYSTEM CONNECTOR TAB --- */}
         {activeSubTab === "creative" && (
           <div className="space-y-4">
-            <div className="bg-slate-50 p-5 rounded-xl border border-slate-200">
-              <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2 mb-1">
-                <Boxes className="w-4 h-4 text-blue-600" />
+            <div className="bg-manila/40 p-5 rounded-xl border-2 border-ink shadow-press">
+              <h3 className="font-serif text-base font-bold text-ink flex items-center gap-2 mb-1">
+                <Boxes className="w-4 h-4 text-terracotta" />
                 Unity, Blender & Local Workspace Scanner
               </h3>
-              <p className="text-xs text-slate-500 mb-4">
+              <p className="font-serif italic text-xs text-ink-muted mb-4">
                 Point to any local project folder. The scanner automatically detects Unity assets (`Assets/`, `ProjectSettings/`, C# scripts), Blender `.blend` 3D scene files, and `project_summary.txt` notes.
               </p>
 
-              <form onSubmit={handleFsScan} className="space-y-3">
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <form onSubmit={handleFsScan} className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div className="sm:col-span-2">
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">Local Directory Path</label>
+                    <label className="block font-mono text-[11px] font-bold text-ink mb-1 uppercase tracking-wider">
+                      Local Directory Path
+                    </label>
                     <input
                       type="text"
                       placeholder="e.g. C:\Users\Username\Projects\GameProject"
                       value={fsPath}
                       onChange={(e) => setFsPath(e.target.value)}
                       required
-                      className="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg bg-white font-mono"
+                      className="w-full font-mono text-xs px-3 py-2 border-2 border-ink rounded bg-[#fffdf9] text-ink focus:outline-none focus:ring-2 focus:ring-terracotta"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">Project Name (Optional)</label>
+                    <label className="block font-mono text-[11px] font-bold text-ink mb-1 uppercase tracking-wider">
+                      Project Name (Optional)
+                    </label>
                     <input
                       type="text"
                       placeholder="e.g. SciFi Physics Simulation"
                       value={fsProjectName}
                       onChange={(e) => setFsProjectName(e.target.value)}
-                      className="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg bg-white"
+                      className="w-full font-mono text-xs px-3 py-2 border-2 border-ink rounded bg-[#fffdf9] text-ink focus:outline-none focus:ring-2 focus:ring-terracotta"
                     />
                   </div>
                 </div>
 
-                <div className="flex justify-end pt-1">
+                <div className="flex justify-end pt-2">
                   <button
                     type="submit"
                     disabled={scanningFs}
-                    className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg shadow transition disabled:opacity-50"
+                    className="inline-flex items-center gap-2 px-5 py-2.5 bg-terracotta hover:bg-[#b03d25] text-paper font-mono font-bold text-xs uppercase tracking-wider rounded-lg border-2 border-ink shadow-press hover:translate-x-[1px] hover:translate-y-[1px] transition-all disabled:opacity-50"
                   >
                     {scanningFs ? (
                       <>
-                        <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                        Scanning Folder & Extracting Metadata...
+                        <div className="w-3.5 h-3.5 border-2 border-paper border-t-transparent rounded-full animate-spin" />
+                        SCANNING DIRECTORY...
                       </>
                     ) : (
                       <>
                         <FileSearch className="w-3.5 h-3.5" />
-                        Scan & Embed Local Project
+                        SCAN & EMBED LOCAL PROJECT
                       </>
                     )}
                   </button>
@@ -446,19 +494,19 @@ export default function ConnectorsHub({ onRefreshStats }: ConnectorsHubProps) {
 
             {/* Scan Result */}
             {fsResult && (
-              <div className="p-4 bg-white border border-slate-200 rounded-xl space-y-2 text-xs">
-                <div className="flex items-center justify-between font-bold text-slate-900 border-b pb-2">
-                  <span>{fsResult.project_name}</span>
-                  <span className="text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+              <div className="p-5 bg-[#fffdf9] border-2 border-ink rounded-xl shadow-press space-y-2.5 font-serif text-xs">
+                <div className="flex items-center justify-between font-bold text-ink border-b-2 border-ink/20 pb-2">
+                  <span className="text-sm">{fsResult.project_name}</span>
+                  <span className="font-mono text-xs text-terracotta bg-[#fff0ed] px-2.5 py-0.5 rounded border border-terracotta/40">
                     {fsResult.project_type}
                   </span>
                 </div>
-                <div className="text-slate-600">
-                  <strong>Path:</strong> <code className="font-mono bg-slate-100 px-1 py-0.5 rounded">{fsResult.directory_path}</code>
+                <div className="text-ink-muted">
+                  <strong>Path:</strong> <code className="font-mono bg-manila px-1.5 py-0.5 rounded border border-ink/20">{fsResult.directory_path}</code>
                 </div>
-                <div className="flex flex-wrap gap-1 mt-1">
+                <div className="flex flex-wrap gap-1.5 mt-2">
                   {fsResult.detected_technologies.map((t, idx) => (
-                    <span key={idx} className="bg-indigo-50 text-indigo-700 text-[10px] px-2 py-0.5 rounded border border-indigo-100 font-medium">
+                    <span key={idx} className="bg-manila text-ink font-mono text-[10px] px-2 py-0.5 rounded border border-ink/30">
                       {t}
                     </span>
                   ))}
@@ -471,3 +519,4 @@ export default function ConnectorsHub({ onRefreshStats }: ConnectorsHubProps) {
     </div>
   );
 }
+

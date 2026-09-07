@@ -1,6 +1,7 @@
 import {
   HealthResponse,
   KnowledgeBaseStats,
+  CandidateProfileResponse,
   TailorResponse,
   ResumeData,
   CareerRecommendationsResponse,
@@ -33,6 +34,22 @@ export async function fetchKBStats(): Promise<KnowledgeBaseStats> {
 export async function fetchKBItems(): Promise<Record<string, any[]>> {
   const res = await fetch(`${API_BASE}/api/knowledge-base/items`);
   if (!res.ok) throw new Error("Failed to fetch knowledge base items");
+  return res.json();
+}
+
+export async function fetchKBProfile(): Promise<CandidateProfileResponse> {
+  const res = await fetch(`${API_BASE}/api/knowledge-base/profile`);
+  if (!res.ok) throw new Error("Failed to fetch candidate profile");
+  return res.json();
+}
+
+export async function ingestProfile(payload: any): Promise<{ message: string; indexed: Record<string, number> }> {
+  const res = await fetch(`${API_BASE}/api/knowledge-base/ingest-profile`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw new Error("Failed to ingest structured profile");
   return res.json();
 }
 
@@ -189,6 +206,70 @@ export async function scanLocalProject(
   if (!res.ok) {
     const err = await res.text();
     throw new Error(err || "Failed to scan local project folder");
+  }
+  return res.json();
+}
+
+export async function parseLinkedInCSV(
+  positionsCsv?: string,
+  skillsCsv?: string
+): Promise<{ status: string; ingested_counts: Record<string, number>; stats: KnowledgeBaseStats }> {
+  const res = await fetch(`${API_BASE}/api/connectors/linkedin/parse-csv`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ positions_csv: positionsCsv, skills_csv: skillsCsv }),
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(err || "Failed to parse LinkedIn CSV export");
+  }
+  return res.json();
+}
+
+export async function scanVault(
+  directoryPath: string
+): Promise<VaultScanResult> {
+  const res = await fetch(`${API_BASE}/api/connectors/vault/scan`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ directory_path: directoryPath }),
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(err || "Failed to scan Markdown Vault");
+  }
+  return res.json();
+}
+
+export async function generateCoverLetter(
+  jobDescription: string,
+  targetRole = "Software Engineer",
+  model = "llama3"
+): Promise<CoverLetterResponse> {
+  const res = await fetch(`${API_BASE}/api/generate-cover-letter`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ job_description: jobDescription, target_role: targetRole, model }),
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(err || "Failed to generate Cover Letter");
+  }
+  return res.json();
+}
+
+export async function analyzeATSGap(
+  jobDescription: string,
+  model = "llama3"
+): Promise<ATSAnalysisResponse> {
+  const res = await fetch(`${API_BASE}/api/analyze-ats-gap`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ job_description: jobDescription, model }),
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(err || "Failed to analyze ATS Gap");
   }
   return res.json();
 }

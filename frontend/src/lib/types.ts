@@ -78,6 +78,16 @@ export interface KnowledgeBaseStats {
   total_items: number;
 }
 
+export interface CandidateProfileResponse {
+  exists: boolean;
+  total_items: number;
+  candidate: ContactInfo & { name?: string };
+  experiences: ExperienceItem[];
+  projects: ProjectItem[];
+  skills: SkillCategory[];
+  education: EducationItem[];
+}
+
 export interface OllamaStatus {
   online: boolean;
   models: string[];
@@ -136,4 +146,30 @@ export interface FilesystemScanResult {
   detected_technologies: string[];
   directory_path: string;
   highlights_count: number;
+}
+
+export interface ATSAnalysisResponse {
+  ats_score: number;
+  summary_verdict: string;
+  matched_skills: string[];
+  missing_skills: string[];
+  bullet_recommendations: string[];
+  _ai_provider?: string;
+}
+
+export interface CoverLetterResponse {
+  company_name: string;
+  role_title: string;
+  cover_letter_body: string;
+  linkedin_outreach_message: string;
+  key_highlights_cited: string[];
+  _ai_provider?: string;
+}
+
+export interface VaultScanResult {
+  status: string;
+  vault_path: string;
+  files_scanned: number;
+  total_chunks: number;
+  processed_files: Array<{ title: string; path: string; chunks: number }>;
 }

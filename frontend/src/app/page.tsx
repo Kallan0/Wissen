@@ -56,7 +56,7 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-100/70 text-slate-900">
+    <div className="min-h-screen flex flex-col text-ink selection:bg-terracotta selection:text-paper">
       <Navbar
         health={health}
         activeTab={activeTab}
@@ -65,48 +65,50 @@ export default function Home() {
         isLoading={isLoadingHealth}
       />
 
-      <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
-        {activeTab === "roles" && (
-          <RoleRecommender
-            models={models}
-            onSelectRoleForTailoring={handleSelectRoleForTailoring}
-          />
-        )}
-
-        {activeTab === "tailor" && (
-          <div className="space-y-6">
-            <JobTailor
+      <div className="lg:mr-72 flex flex-col min-h-screen pt-16">
+        <main className="flex-1 max-w-6xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
+          {activeTab === "roles" && (
+            <RoleRecommender
               models={models}
-              onTailored={handleTailored}
-              initialRole={tailorRole}
-              initialJd={tailorJd}
+              onSelectRoleForTailoring={handleSelectRoleForTailoring}
             />
-            {ragContext && <RetrievalMatches context={ragContext} />}
-          </div>
-        )}
+          )}
 
-        {activeTab === "preview" && (
-          <div className="space-y-6">
-            {ragContext && <RetrievalMatches context={ragContext} />}
-            <ResumePreview
-              resume={currentResume}
-              onUpdateResume={(updated) => setCurrentResume(updated)}
-            />
-          </div>
-        )}
+          {activeTab === "tailor" && (
+            <div className="space-y-6">
+              <JobTailor
+                models={models}
+                onTailored={handleTailored}
+                initialRole={tailorRole}
+                initialJd={tailorJd}
+              />
+              {ragContext && <RetrievalMatches context={ragContext} />}
+            </div>
+          )}
 
-        {activeTab === "connectors" && (
-          <ConnectorsHub onRefreshStats={loadHealthAndModels} />
-        )}
+          {activeTab === "preview" && (
+            <div className="space-y-6">
+              {ragContext && <RetrievalMatches context={ragContext} />}
+              <ResumePreview
+                resume={currentResume}
+                onUpdateResume={(updated) => setCurrentResume(updated)}
+              />
+            </div>
+          )}
 
-        {activeTab === "knowledge" && (
-          <KnowledgeBase onRefreshStats={loadHealthAndModels} />
-        )}
-      </main>
+          {activeTab === "connectors" && (
+            <ConnectorsHub onRefreshStats={loadHealthAndModels} />
+          )}
 
-      <footer className="border-t border-slate-200 bg-white py-4 text-center text-xs text-slate-500">
-        Local AI Resume Builder &bull; Privacy-First &bull; ChromaDB + Ollama + Next.js + Playwright
-      </footer>
+          {activeTab === "knowledge" && (
+            <KnowledgeBase onRefreshStats={loadHealthAndModels} />
+          )}
+        </main>
+
+        <footer className="border-t-2 border-ink/10 bg-transparent py-5 text-center font-mono text-xs text-ink-muted">
+          Wissen Press &bull; Privacy-First Local AI Resume Synthesizer
+        </footer>
+      </div>
     </div>
   );
 }

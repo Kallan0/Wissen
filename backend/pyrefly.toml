@@ -1,0 +1,18 @@
+# pyrefly.toml – Pyrefly type-checker configuration
+# Docs: https://pyrefly.org/en/docs/configuration/
+
+# Point Pyrefly at the virtualenv so it can resolve all installed packages.
+python_interpreter = "venv/Scripts/python.exe"
+
+# Include the backend root so relative imports (config, rag.*, ai.*, etc.)
+# resolve correctly when Pyrefly analyses individual files.
+search_path = ["."]
+
+# Ignore the venv itself and generated caches.
+[ignore]
+paths = [
+  "venv/**",
+  "__pycache__/**",
+  "data/**",
+  ".pytest_cache/**",
+]

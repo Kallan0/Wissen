@@ -1,8 +1,10 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Sparkles, Briefcase, FileCode, CheckCircle2, AlertCircle } from "lucide-react";
-import { tailorResume } from "@/lib/api";
+import { Sparkles, Briefcase, FileCode, CheckCircle2, AlertCircle, ScrollText, Stamp, Tag } from "lucide-react";
+import EmptyKBBanner from "@/components/EmptyKBBanner";
+import ProfileQuestionnaireModal from "@/components/ProfileQuestionnaireModal";
+import { tailorResume, fetchKBProfile } from "@/lib/api";
 import { TailorResponse } from "@/lib/types";
 
 interface JobTailorProps {
@@ -14,7 +16,7 @@ interface JobTailorProps {
 
 const SAMPLE_JDS = [
   {
-    label: "Senior Full-Stack & RAG Engineer",
+    label: "[REF-01] Senior AI & RAG Engineer",
     role: "Senior AI / Full-Stack Engineer",
     text: `About the Role:
 We are seeking an experienced Senior Full-Stack Engineer to architect our next-generation privacy-first AI intelligence platform. You will be responsible for designing high-performance backend microservices in Python (FastAPI), connecting retrieval-augmented generation (RAG) pipelines using ChromaDB and local LLMs (Ollama / Llama 3), and delivering polished web applications with Next.js and Tailwind CSS.
@@ -26,7 +28,7 @@ Requirements:
 - Strong grounding in headless browser PDF generation and automated test workflows.`,
   },
   {
-    label: "Python Backend & Systems Developer",
+    label: "[REF-02] Python Systems Architect",
     role: "Senior Python Backend Engineer",
     text: `Job Description:
 We are hiring a Senior Python Backend Developer to design high-throughput microservices, optimize distributed database schemas, and build resilient ETL pipelines. 
@@ -43,13 +45,36 @@ export default function JobTailor({ models, onTailored, initialRole, initialJd }
   const [jobDescription, setJobDescription] = useState(initialJd || SAMPLE_JDS[0].text);
   const [targetRole, setTargetRole] = useState(initialRole || SAMPLE_JDS[0].role);
   const [selectedModel, setSelectedModel] = useState(models[0] || "llama3");
-  const [template, setTemplate] = useState("modern");
-  const [candidateName, setCandidateName] = useState("Joji Developer");
-  const [candidateEmail, setCandidateEmail] = useState("joji.dev@example.com");
-  const [candidateLocation, setCandidateLocation] = useState("Bengaluru, India / Remote");
+  const [template, setTemplate] = useState("vintage");
+  const [candidateName, setCandidateName] = useState("");
+  const [candidateEmail, setCandidateEmail] = useState("");
+  const [candidateLocation, setCandidateLocation] = useState("");
+
+  const [isKBEmpty, setIsKBEmpty] = useState(false);
+  const [isQuestionnaireOpen, setIsQuestionnaireOpen] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const loadCandidateProfile = async () => {
+    try {
+      const prof = await fetchKBProfile();
+      if (!prof.exists || prof.total_items === 0) {
+        setIsKBEmpty(true);
+      } else {
+        setIsKBEmpty(false);
+        if (prof.candidate?.name) setCandidateName(prof.candidate.name);
+        if (prof.candidate?.email) setCandidateEmail(prof.candidate.email);
+        if (prof.candidate?.location) setCandidateLocation(prof.candidate.location);
+      }
+    } catch (err) {
+      console.error("Error loading candidate profile:", err);
+    }
+  };
+
+  useEffect(() => {
+    loadCandidateProfile();
+  }, []);
 
   useEffect(() => {
     if (models.length > 0 && (!selectedModel || selectedModel === "llama3")) {
@@ -90,73 +115,96 @@ export default function JobTailor({ models, onTailored, initialRole, initialJd }
 
   return (
     <div className="space-y-6">
-      <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 mb-4 border-b border-slate-100 gap-2">
+      {isKBEmpty && (
+        <EmptyKBBanner
+          onOpenQuestionnaire={() => setIsQuestionnaireOpen(true)}
+          onRefresh={loadCandidateProfile}
+        />
+      )}
+
+      {/* Editorial Manila Dossier Container */}
+      <div className="bg-[#fffdf9] p-6 sm:p-8 rounded-xl border-2 border-ink shadow-dossier relative overflow-hidden">
+        {/* Top Header Badge Strip */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-5 mb-6 border-b-2 border-ink/20 gap-4">
           <div>
-            <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-              <Briefcase className="w-5 h-5 text-blue-600" />
+            <div className="flex items-center gap-2 mb-1">
+              <span className="font-mono text-[11px] uppercase tracking-widest bg-ink text-paper px-2 py-0.5 font-bold">
+                DOSSIER SPECIFICATION
+              </span>
+              <span className="font-mono text-[11px] text-ink-muted uppercase tracking-wider">
+                SERIES: 2026-PRESS // ATS-GROUNDED
+              </span>
+            </div>
+            <h2 className="text-2xl sm:text-3xl font-serif font-bold text-ink tracking-tight flex items-center gap-2.5">
+              <ScrollText className="w-6 h-6 text-terracotta" />
               Tailor Resume to Job Description
             </h2>
-            <p className="text-sm text-slate-500 mt-1">
-              ChromaDB performs vector similarity retrieval against your verified career database, and the local LLM synthesizes an ATS-optimized resume.
+            <p className="text-xs sm:text-sm text-ink-muted font-serif italic mt-1 max-w-2xl">
+              ChromaDB performs vector similarity retrieval against your verified career database, and the local Ollama LLM synthesizes an ATS-optimized tactile CV.
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-medium text-slate-500">Quick Samples:</span>
-            {SAMPLE_JDS.map((s, idx) => (
-              <button
-                key={idx}
-                type="button"
-                onClick={() => {
-                  setJobDescription(s.text);
-                  setTargetRole(s.role);
-                }}
-                className="text-xs bg-slate-100 hover:bg-blue-50 hover:text-blue-600 text-slate-700 font-medium px-2.5 py-1 rounded transition border border-slate-200"
-              >
-                {s.label}
-              </button>
-            ))}
+
+          {/* Quick Samples */}
+          <div className="flex flex-col items-start sm:items-end gap-1.5 shrink-0">
+            <span className="font-mono text-[10px] uppercase tracking-widest text-ink-muted font-bold flex items-center gap-1">
+              <Tag className="w-3 h-3 text-terracotta" /> Reference Samples:
+            </span>
+            <div className="flex flex-wrap gap-2">
+              {SAMPLE_JDS.map((s, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => {
+                    setJobDescription(s.text);
+                    setTargetRole(s.role);
+                  }}
+                  className="font-mono text-xs bg-manila hover:bg-terracotta hover:text-paper text-ink font-semibold px-3 py-1 rounded border-2 border-ink shadow-press transition-all active:translate-x-[1px] active:translate-y-[1px]"
+                >
+                  {s.label}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
         {error && (
-          <div className="p-4 mb-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3 text-red-700 text-sm">
-            <AlertCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+          <div className="p-4 mb-6 bg-[#fff0ed] border-2 border-terracotta rounded-lg flex items-start gap-3 text-terracotta shadow-press">
+            <AlertCircle className="w-5 h-5 text-terracotta shrink-0 mt-0.5" />
             <div>
-              <p className="font-semibold">Generation Notice</p>
-              <p>{error}</p>
+              <p className="font-mono font-bold text-xs uppercase tracking-wider">TELEGRAM DISPATCH NOTICE</p>
+              <p className="text-xs font-serif mt-0.5">{error}</p>
             </div>
           </div>
         )}
 
         {/* Configuration Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5">
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1 uppercase tracking-wide">
-              Target Role Title
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-6">
+          <div className="bg-manila/50 p-4 rounded-lg border-2 border-ink shadow-press">
+            <label className="block font-mono text-[11px] font-bold text-ink mb-1.5 uppercase tracking-wider">
+              [01] Target Role Title
             </label>
             <input
               type="text"
               value={targetRole}
               onChange={(e) => setTargetRole(e.target.value)}
               placeholder="e.g. Senior Full-Stack Engineer"
-              className="w-full text-sm px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full font-mono text-xs px-3 py-2 border-2 border-ink rounded bg-[#fffdf9] text-ink focus:outline-none focus:ring-2 focus:ring-terracotta"
             />
           </div>
 
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1 uppercase tracking-wide">
-              Local Ollama Model
+          <div className="bg-manila/50 p-4 rounded-lg border-2 border-ink shadow-press">
+            <label className="block font-mono text-[11px] font-bold text-ink mb-1.5 uppercase tracking-wider">
+              [02] Local Ollama Engine
             </label>
             <select
               value={selectedModel}
               onChange={(e) => setSelectedModel(e.target.value)}
-              className="w-full text-sm px-3 py-2 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full font-mono text-xs px-3 py-2 border-2 border-ink rounded bg-[#fffdf9] text-ink focus:outline-none focus:ring-2 focus:ring-terracotta"
             >
               {models.length > 0 ? (
                 models.map((m) => (
                   <option key={m} value={m}>
-                    {m}
+                    {m} (Active)
                   </option>
                 ))
               ) : (
@@ -165,88 +213,121 @@ export default function JobTailor({ models, onTailored, initialRole, initialJd }
             </select>
           </div>
 
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1 uppercase tracking-wide">
-              Resume Style Template
+          <div className="bg-manila/50 p-4 rounded-lg border-2 border-ink shadow-press">
+            <label className="block font-mono text-[11px] font-bold text-ink mb-1.5 uppercase tracking-wider">
+              [03] Typography & Layout
             </label>
             <select
               value={template}
               onChange={(e) => setTemplate(e.target.value)}
-              className="w-full text-sm px-3 py-2 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full font-mono text-xs px-3 py-2 border-2 border-ink rounded bg-[#fffdf9] text-ink focus:outline-none focus:ring-2 focus:ring-terracotta"
             >
+              <option value="vintage">Wissen Vintage Press (Tactile Editorial)</option>
               <option value="modern">Modern Tech (Clean Blue Accent)</option>
               <option value="minimal">Minimalist Executive (Serif Monochrome)</option>
             </select>
           </div>
         </div>
 
-        {/* Candidate Information (Collapsible / Customizable) */}
-        <div className="bg-slate-50 p-3.5 rounded-lg border border-slate-200 mb-5">
-          <div className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-            Candidate Header Overrides
+        {/* Candidate Information Docket */}
+        <div className="bg-paper p-4 rounded-lg border-2 border-ink mb-6 shadow-press">
+          <div className="font-mono text-[11px] font-bold text-ink uppercase tracking-widest mb-3 flex items-center justify-between">
+            <span className="flex items-center gap-1.5">
+              <CheckCircle2 className="w-3.5 h-3.5 text-fountain-teal" />
+              Candidate Dossier Identity
+            </span>
+            <span className="text-[10px] text-ink-muted uppercase font-normal">
+              EDITABLE PRE-FLIGHT OVERRIDES
+            </span>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <input
-              type="text"
-              placeholder="Candidate Name"
-              value={candidateName}
-              onChange={(e) => setCandidateName(e.target.value)}
-              className="text-xs px-3 py-1.5 border border-slate-300 rounded bg-white"
-            />
-            <input
-              type="email"
-              placeholder="Contact Email"
-              value={candidateEmail}
-              onChange={(e) => setCandidateEmail(e.target.value)}
-              className="text-xs px-3 py-1.5 border border-slate-300 rounded bg-white"
-            />
-            <input
-              type="text"
-              placeholder="Location"
-              value={candidateLocation}
-              onChange={(e) => setCandidateLocation(e.target.value)}
-              className="text-xs px-3 py-1.5 border border-slate-300 rounded bg-white"
-            />
+            <div>
+              <span className="font-mono text-[9px] uppercase tracking-wider text-ink-muted block mb-1">CANDIDATE NAME</span>
+              <input
+                type="text"
+                placeholder="Candidate Name"
+                value={candidateName}
+                onChange={(e) => setCandidateName(e.target.value)}
+                className="w-full font-mono text-xs px-3 py-1.5 border-2 border-ink/40 focus:border-ink rounded bg-[#fffdf9]"
+              />
+            </div>
+            <div>
+              <span className="font-mono text-[9px] uppercase tracking-wider text-ink-muted block mb-1">CONTACT EMAIL</span>
+              <input
+                type="email"
+                placeholder="Contact Email"
+                value={candidateEmail}
+                onChange={(e) => setCandidateEmail(e.target.value)}
+                className="w-full font-mono text-xs px-3 py-1.5 border-2 border-ink/40 focus:border-ink rounded bg-[#fffdf9]"
+              />
+            </div>
+            <div>
+              <span className="font-mono text-[9px] uppercase tracking-wider text-ink-muted block mb-1">DISPATCH LOCATION</span>
+              <input
+                type="text"
+                placeholder="Location"
+                value={candidateLocation}
+                onChange={(e) => setCandidateLocation(e.target.value)}
+                className="w-full font-mono text-xs px-3 py-1.5 border-2 border-ink/40 focus:border-ink rounded bg-[#fffdf9]"
+              />
+            </div>
           </div>
         </div>
 
         {/* Job Description Textarea */}
         <div className="mb-6">
-          <label className="block text-xs font-semibold text-slate-700 mb-1 uppercase tracking-wide">
-            Job Description (JD)
-          </label>
+          <div className="flex items-center justify-between mb-1.5">
+            <label className="block font-mono text-[11px] font-bold text-ink uppercase tracking-wider">
+              [04] Target Job Description (Paste JD Text)
+            </label>
+            <span className="font-mono text-[10px] text-ink-muted uppercase">
+              RAG VECTOR EMBEDDINGS MATCH AGAINST THIS CONTENT
+            </span>
+          </div>
           <textarea
-            rows={10}
+            rows={9}
             value={jobDescription}
             onChange={(e) => setJobDescription(e.target.value)}
-            placeholder="Paste the target job description here..."
-            className="w-full text-sm font-mono p-3.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent leading-relaxed"
+            placeholder="Paste the target job description or requirements here..."
+            className="w-full font-mono text-xs p-4 border-2 border-ink rounded-lg bg-[#fffdf9] focus:outline-none focus:ring-2 focus:ring-terracotta leading-relaxed shadow-press"
           />
         </div>
 
-        {/* Trigger Button */}
-        <div className="flex justify-end">
+        {/* Trigger Mechanical Action Button */}
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2 border-t-2 border-ink/10">
+          <div className="flex items-center gap-2">
+            <span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-600 animate-pulse" />
+            <span className="font-mono text-[11px] text-ink-muted uppercase tracking-wider">
+              Local Ollama Inference Engine &bull; Zero External Telemetry
+            </span>
+          </div>
+
           <button
             type="button"
             onClick={handleGenerate}
             disabled={loading}
-            className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 px-6 py-3.5 bg-terracotta hover:bg-[#b03d25] text-paper font-mono font-bold text-xs uppercase tracking-wider rounded-lg border-2 border-ink shadow-press-lg hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-press active:translate-x-[2px] active:translate-y-[2px] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? (
               <>
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                Querying ChromaDB & Ollama...
+                <div className="w-4 h-4 border-2 border-paper border-t-transparent rounded-full animate-spin" />
+                <span>QUERYING CHROMADB & SYNTHESIZING...</span>
               </>
             ) : (
               <>
-                <Sparkles className="w-4 h-4" />
-                Generate Tailored Resume
+                <Sparkles className="w-4 h-4 text-paper" />
+                <span>EXECUTE PRESS & TAILOR RESUME</span>
               </>
             )}
           </button>
         </div>
       </div>
+
+      <ProfileQuestionnaireModal
+        isOpen={isQuestionnaireOpen}
+        onClose={() => setIsQuestionnaireOpen(false)}
+        onSuccess={loadCandidateProfile}
+      />
     </div>
   );
 }

@@ -1,13 +1,24 @@
 "use client";
 
-import React from "react";
-import { ShieldCheck, Cpu, Database, RefreshCw, FileText } from "lucide-react";
+import React, { useState } from "react";
+import {
+  Compass,
+  FileText,
+  Layers,
+  Database,
+  ScrollText,
+  Sparkles,
+  RefreshCw,
+  Menu,
+  X,
+  LogIn,
+} from "lucide-react";
 import { HealthResponse } from "@/lib/types";
 
 interface NavbarProps {
   health: HealthResponse | null;
-  activeTab: "tailor" | "preview" | "knowledge" | "roles" | "connectors";
-  setActiveTab: (tab: "tailor" | "preview" | "knowledge" | "roles" | "connectors") => void;
+  activeTab: "roles" | "tailor" | "preview" | "connectors" | "knowledge";
+  setActiveTab: (tab: "roles" | "tailor" | "preview" | "connectors" | "knowledge") => void;
   refreshHealth: () => void;
   isLoading: boolean;
 }
@@ -19,117 +30,159 @@ export default function Navbar({
   refreshHealth,
   isLoading,
 }: NavbarProps) {
-  const isBackendUp = health?.status === "healthy";
+  const [mobileOpen, setMobileOpen] = useState(false);
   const isOllamaUp = health?.ollama?.online;
   const totalItems = health?.knowledge_base?.total_items ?? 0;
 
+  const NAV_ITEMS = [
+    { id: "roles" as const, label: "Role Matches", code: "[01]", icon: Compass },
+    { id: "tailor" as const, label: "Job Tailor", code: "[02]", icon: ScrollText },
+    { id: "preview" as const, label: "Resume & PDF", code: "[03]", icon: FileText },
+    { id: "connectors" as const, label: "Connectors", code: "[04]", icon: Layers },
+    { id: "knowledge" as const, label: "Archive Stock", code: "[05]", icon: Database },
+  ];
+
   return (
-    <header className="sticky top-0 z-50 bg-slate-900 border-b border-slate-800 text-white shadow-md">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
-          {/* Brand */}
-          <div className="flex items-center space-x-3">
-            <div className="p-2 bg-gradient-to-tr from-blue-600 to-indigo-500 rounded-lg shadow">
-              <ShieldCheck className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <div className="flex items-center space-x-2">
-                <span className="font-bold text-lg tracking-tight">Local AI Resume</span>
-                <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400 border border-blue-500/30">
-                  100% Privacy
+    <>
+      {/* 
+        TOP HEADER:
+        Matches Google Stitch layout.
+        Strictly includes ONLY the MCP logo, the name "Wissen", and the "Login" button.
+      */}
+      <header className="fixed top-0 left-0 right-0 lg:right-72 z-40 bg-[#fff8f4]/95 backdrop-blur-md border-b-2 border-ink shadow-[0_2px_0px_#221a12] h-16">
+        <div className="h-full px-5 sm:px-8 flex items-center justify-between">
+          {/* Logo + Name */}
+          <div className="flex items-center gap-3">
+            <img
+              alt="Wissen Typewriter Key Logo"
+              className="h-8 w-auto object-contain"
+              src="/wissen-logo.png"
+            />
+            <span className="font-serif text-2xl font-bold text-ink tracking-tight leading-none">
+              Wissen
+            </span>
+          </div>
+        </div>
+      </header>
+
+      {/* Backdrop for Mobile Drawer */}
+      {mobileOpen && (
+        <div
+          className="fixed inset-0 bg-ink/40 z-40 lg:hidden backdrop-blur-xs"
+          onClick={() => setMobileOpen(false)}
+        />
+      )}
+
+      {/* 
+        RIGHT NAVIGATION PANEL:
+        Fixed vertical aside matching the Stitch screen layout exactly.
+      */}
+      <aside
+        className={`fixed right-0 top-0 bottom-0 w-72 bg-manila border-l-2 border-ink shadow-[-3px_0_0px_#221a12] z-50 flex flex-col justify-between transition-transform duration-200 ease-in-out ${mobileOpen ? "translate-x-0" : "translate-x-full lg:translate-x-0"
+          }`}
+      >
+        <div className="p-6 flex flex-col gap-6">
+          {/* Top Profile / Mode Header */}
+          <div className="flex items-center justify-between pb-4 border-b-2 border-ink/20">
+            <div className="flex items-center gap-3">
+              <img
+                alt="Artisan Profile"
+                className="w-9 h-9 rounded-full object-cover border-2 border-ink shadow-press"
+                src="/artisan-avatar.png"
+              />
+              <div className="flex flex-col">
+                <span className="font-mono text-xs font-bold uppercase text-ink leading-tight">
+                  Artisan Desk
+                </span>
+                <span className="font-mono text-[10px] text-ink-muted leading-tight">
+                  Curator Mode
                 </span>
               </div>
-              <p className="text-[11px] text-slate-400">ChromaDB RAG &bull; Ollama Local LLMs</p>
             </div>
+            <span className="font-mono text-[10px] uppercase bg-[#fffdf9] px-2 py-0.5 rounded text-ink border-2 border-ink font-bold shadow-sm">
+              Ref. 08
+            </span>
           </div>
 
-          {/* Navigation Tabs */}
-          <nav className="flex space-x-1 bg-slate-800/80 p-1 rounded-lg border border-slate-700/60">
-            <button
-              onClick={() => setActiveTab("roles")}
-              className={`px-3.5 py-1.5 rounded-md text-sm font-medium transition-all ${
-                activeTab === "roles"
-                  ? "bg-blue-600 text-white shadow"
-                  : "text-slate-300 hover:text-white hover:bg-slate-700/50"
-              }`}
-            >
-              Role Matches
-            </button>
-            <button
-              onClick={() => setActiveTab("tailor")}
-              className={`px-3.5 py-1.5 rounded-md text-sm font-medium transition-all ${
-                activeTab === "tailor"
-                  ? "bg-blue-600 text-white shadow"
-                  : "text-slate-300 hover:text-white hover:bg-slate-700/50"
-              }`}
-            >
-              Job Tailor
-            </button>
-            <button
-              onClick={() => setActiveTab("preview")}
-              className={`px-3.5 py-1.5 rounded-md text-sm font-medium transition-all ${
-                activeTab === "preview"
-                  ? "bg-blue-600 text-white shadow"
-                  : "text-slate-300 hover:text-white hover:bg-slate-700/50"
-              }`}
-            >
-              Resume & PDF
-            </button>
-            <button
-              onClick={() => setActiveTab("connectors")}
-              className={`px-3.5 py-1.5 rounded-md text-sm font-medium transition-all ${
-                activeTab === "connectors"
-                  ? "bg-blue-600 text-white shadow"
-                  : "text-slate-300 hover:text-white hover:bg-slate-700/50"
-              }`}
-            >
-              Connectors
-            </button>
-            <button
-              onClick={() => setActiveTab("knowledge")}
-              className={`px-3.5 py-1.5 rounded-md text-sm font-medium transition-all ${
-                activeTab === "knowledge"
-                  ? "bg-blue-600 text-white shadow"
-                  : "text-slate-300 hover:text-white hover:bg-slate-700/50"
-              }`}
-            >
-              Knowledge Base
-            </button>
+          {/* Navigation Items (The App's Core Tabs) */}
+          <nav className="flex flex-col gap-2">
+            {NAV_ITEMS.map((item) => {
+              const Icon = item.icon;
+              const isActive = activeTab === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => {
+                    setActiveTab(item.id);
+                    setMobileOpen(false);
+                  }}
+                  className={`flex items-center justify-between px-3.5 py-2.5 rounded font-mono text-xs uppercase tracking-wider transition-all border-2 text-left ${isActive
+                      ? "bg-terracotta text-paper font-bold border-ink shadow-press translate-x-1"
+                      : "text-ink border-transparent hover:bg-paper/90 hover:border-ink/30 hover:text-ink"
+                    }`}
+                >
+                  <span className="flex items-center gap-2.5">
+                    <Icon className={`w-4 h-4 ${isActive ? "text-paper" : "text-ink-muted"}`} />
+                    <span>{item.label}</span>
+                  </span>
+                  <span
+                    className={`font-mono text-[10px] font-bold ${isActive ? "text-paper/90" : "text-ink-muted"
+                      }`}
+                  >
+                    {item.code}
+                  </span>
+                </button>
+              );
+            })}
           </nav>
+        </div>
 
-          {/* System Status Indicators */}
-          <div className="hidden md:flex items-center space-x-3 text-xs">
-            {/* Ollama Status */}
-            <div
-              className={`flex items-center space-x-1.5 px-2.5 py-1 rounded-full border ${
-                isOllamaUp
-                  ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
-                  : "bg-amber-500/10 text-amber-400 border-amber-500/30"
-              }`}
-              title={isOllamaUp ? "Ollama running locally" : "Ollama offline; using local synthesized fallback"}
-            >
-              <Cpu className="w-3.5 h-3.5" />
-              <span>{isOllamaUp ? "Ollama Online" : "Ollama Offline"}</span>
-            </div>
+        {/* Bottom Section: Action & Archival Telemetry */}
+        <div className="p-6 border-t-2 border-ink/20 bg-paper/60 flex flex-col gap-3.5">
+          <button
+            type="button"
+            onClick={() => {
+              setActiveTab("tailor");
+              setMobileOpen(false);
+            }}
+            className="w-full flex items-center justify-center gap-2 bg-terracotta hover:bg-[#b03d25] text-paper font-mono text-xs font-bold uppercase py-2.5 px-4 rounded border-2 border-ink shadow-press hover:translate-x-0.5 hover:translate-y-0.5 transition-all"
+          >
+            <Sparkles className="w-4 h-4" />
+            <span>Draft Entry</span>
+          </button>
 
-            {/* Vector DB status */}
-            <div className="flex items-center space-x-1.5 px-2.5 py-1 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
-              <Database className="w-3.5 h-3.5 text-indigo-400" />
-              <span>ChromaDB: <strong className="text-white">{totalItems}</strong> items</span>
-            </div>
+          <div className="flex items-center justify-between font-mono text-[10px] text-ink-muted pt-1">
+            <span className="font-bold">FOLIO ARCHIVE</span>
+            <span>CHROMA: {totalItems} ITEMS</span>
+          </div>
 
-            {/* Refresh button */}
+          {/* Engine Health Status */}
+          <div className="flex items-center justify-between font-mono text-[10px] text-ink-muted border-t border-ink/10 pt-2.5">
+            <span className="flex items-center gap-1.5">
+              <span
+                className={`w-2 h-2 rounded-full ${isOllamaUp ? "bg-emerald-600 animate-pulse" : "bg-terracotta"
+                  }`}
+              />
+              <span>
+                {isOllamaUp
+                  ? health?.ollama?.models && health.ollama.models.length > 0
+                    ? `Ollama: ${health.ollama.models[0].split(":")[0]}`
+                    : "Ollama: Active"
+                  : "Ollama: Offline"}
+              </span>
+            </span>
+
             <button
               onClick={refreshHealth}
               disabled={isLoading}
-              title="Refresh connection status"
-              className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-md transition"
+              className="p-1 hover:bg-manila rounded text-ink transition"
+              title="Refresh System Status"
             >
-              <RefreshCw className={`w-4 h-4 ${isLoading ? "animate-spin text-blue-400" : ""}`} />
+              <RefreshCw className={`w-3 h-3 ${isLoading ? "animate-spin text-terracotta" : ""}`} />
             </button>
           </div>
         </div>
-      </div>
-    </header>
+      </aside>
+    </>
   );
 }

@@ -37,8 +37,4 @@ Thumbs.db
 desktop.ini
 .vscode/
 .idea/
-*.swp
-
-
-# --- Versions ---
-versions/
+*.swp

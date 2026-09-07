@@ -121,3 +121,62 @@ VERIFIED CANDIDATE PROFILE CONTEXT:
 
 Analyze and generate the recommended positions JSON now:
 """
+
+COVER_LETTER_PROMPT = """You are an expert Executive Career Coach and Recruiter.
+Your task is to write a compelling, 3-paragraph Cover Letter and a short LinkedIn Recruiter Cold Outreach Message tailored to a target Job Description, using ONLY verified facts from the candidate's provided context.
+
+CRITICAL RULES:
+1. STRICT TRUTH: Do NOT invent companies, metrics, titles, or experiences not in the context.
+2. TAILORED IMPACT: Paragraph 1 = Strong Hook & Role Alignment. Paragraph 2 = STAR Proof Points citing real projects/companies. Paragraph 3 = Call to Action.
+3. Respond ONLY with valid JSON matching the schema below.
+
+REQUIRED JSON SCHEMA:
+{
+  "company_name": "Target Company or Team",
+  "role_title": "Target Position Title",
+  "cover_letter_body": "3-paragraph formal cover letter text...",
+  "linkedin_outreach_message": "Short 150-word direct message to recruiter or hiring manager...",
+  "key_highlights_cited": ["Highlight 1", "Highlight 2"]
+}
+
+TARGET JOB DESCRIPTION:
+{job_description}
+
+TARGET ROLE TITLE: {target_role}
+
+VERIFIED CANDIDATE PROFILE CONTEXT:
+{candidate_context}
+
+Generate the JSON now:
+"""
+
+ATS_ANALYSIS_PROMPT = """You are an Advanced ATS (Applicant Tracking System) Scanner and Resume Parser.
+Analyze the target Job Description against the candidate's verified context and produce an ATS gap report.
+
+CRITICAL RULES:
+1. Calculate an accurate Fit Score (0-100%) based on skill overlap and depth.
+2. Identify matched hard skills present in both JD and candidate context.
+3. Identify missing hard skills mentioned in the JD but missing from candidate context.
+4. Output MUST be valid JSON only matching the schema below.
+
+REQUIRED JSON SCHEMA:
+{
+  "ats_score": 88,
+  "summary_verdict": "1-2 sentence overall ATS verdict.",
+  "matched_skills": ["Skill1", "Skill2", "Skill3"],
+  "missing_skills": ["SkillA", "SkillB"],
+  "bullet_recommendations": [
+    "Actionable suggestion 1 to emphasize matching experience.",
+    "Actionable suggestion 2."
+  ]
+}
+
+TARGET JOB DESCRIPTION:
+{job_description}
+
+VERIFIED CANDIDATE PROFILE CONTEXT:
+{candidate_context}
+
+Analyze and generate the ATS JSON now:
+"""
+

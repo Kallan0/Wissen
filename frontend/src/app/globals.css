@@ -3,28 +3,46 @@
 @tailwind utilities;
 
 :root {
-  --background: #f8fafc;
-  --foreground: #0f172a;
+  --background: #fff8f4;
+  --foreground: #221a12;
 }
 
 body {
   color: var(--foreground);
-  background: var(--background);
+  background-color: var(--background);
+  background-image: radial-gradient(#8c716b 0.75px, transparent 0.75px);
+  background-size: 24px 24px;
   font-feature-settings: "rlig" 1, "calt" 1;
 }
 
-/* Custom scrollbars */
+/* Tactile air-mail ribbon effect */
+.air-mail-ribbon {
+  background: repeating-linear-gradient(
+    45deg,
+    #a6331b,
+    #a6331b 8px,
+    #fff8f4 8px,
+    #fff8f4 16px,
+    #286864 16px,
+    #286864 24px,
+    #fff8f4 24px,
+    #fff8f4 32px
+  );
+}
+
+/* Mechanical typewriter scrollbars */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 7px;
+  height: 7px;
 }
 ::-webkit-scrollbar-track {
-  background: #f1f5f9;
+  background: #fcebdd;
+  border-left: 1px solid #8c716b;
 }
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 3px;
+  background: #8c716b;
+  border: 1px solid #221a12;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: #58413c;
 }

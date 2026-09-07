@@ -1,7 +1,18 @@
 import os
+import sys
+import asyncio
 import logging
 from typing import Dict, Any, List, Optional
 from pathlib import Path
+
+# ── Windows asyncio fix ───────────────────────────────────────────────────────
+# The default SelectorEventLoop on Windows cannot spawn subprocesses, which
+# Playwright needs to launch Chromium.  ProactorEventLoop supports both I/O
+# and subprocess creation, making it the correct choice for Windows.
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+# ─────────────────────────────────────────────────────────────────────────────
+
 from fastapi import FastAPI, HTTPException, Body, Query, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
@@ -14,6 +25,8 @@ from rag.retriever import rag_retriever
 from ai.generator import resume_generator
 from pdf.generator import pdf_generator
 from connectors import github_connector, canva_connector, creative_fs_connector
+from connectors.linkedin_connector import linkedin_connector
+from connectors.vault_connector import vault_connector
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("resume_builder.main")
@@ -75,6 +88,81 @@ class ExportPDFRequest(BaseModel):
     resume_data: Dict[str, Any] = Field(..., description="Structured resume JSON")
     template: Optional[str] = "modern"
 
+class LinkedInSyncRequest(BaseModel):
+    positions_csv: Optional[str] = Field(None, description="Raw Positions.csv content")
+    skills_csv: Optional[str] = Field(None, description="Raw Skills.csv content")
+
+class VaultScanRequest(BaseModel):
+    directory_path: str = Field(..., description="Local Obsidian or Notion markdown folder path")
+    category: Optional[str] = "markdown_vault"
+
+class CoverLetterRequest(BaseModel):
+    job_description: str = Field(..., description="Target Job Description text")
+    target_role: Optional[str] = Field("Software Engineer", description="Target job title")
+    model: Optional[str] = Field("llama3", description="Ollama model name")
+
+class ATSAnalysisRequest(BaseModel):
+    job_description: str = Field(..., description="Target Job Description text")
+    model: Optional[str] = Field("llama3", description="Ollama model name")
+
+
+def normalize_resume_data(data: Dict[str, Any]) -> Dict[str, Any]:
+    """Ensure all required fields exist with safe defaults before PDF rendering."""
+    contact = data.get("contact") or {}
+    if not isinstance(contact, dict):
+        contact = {}
+    return {
+        "name": data.get("name") or "Candidate",
+        "title": data.get("title") or data.get("target_role") or "Professional",
+        "contact": {
+            "email": contact.get("email") or "",
+            "phone": contact.get("phone") or "",
+            "location": contact.get("location") or "",
+            "linkedin": contact.get("linkedin") or "",
+            "github": contact.get("github") or "",
+            "portfolio": contact.get("portfolio") or "",
+        },
+        "summary": data.get("summary") or "",
+        "skills": [
+            {
+                "category": s.get("category", "Skills") if isinstance(s, dict) else "Skills",
+                "items": s.get("items", []) if isinstance(s, dict) else []
+            }
+            for s in (data.get("skills") or [])
+        ],
+        "experience": [
+            {
+                "company": e.get("company", "") if isinstance(e, dict) else "",
+                "role": e.get("role", "") if isinstance(e, dict) else "",
+                "duration": e.get("duration", "") if isinstance(e, dict) else "",
+                "location": e.get("location", "") if isinstance(e, dict) else "",
+                "bullets": e.get("bullets") or e.get("highlights") or [] if isinstance(e, dict) else [],
+                "technologies": e.get("technologies") or [] if isinstance(e, dict) else [],
+            }
+            for e in (data.get("experience") or [])
+        ],
+        "projects": [
+            {
+                "name": p.get("name", "") if isinstance(p, dict) else "",
+                "description": p.get("description", "") if isinstance(p, dict) else "",
+                "technologies": p.get("technologies") or [] if isinstance(p, dict) else [],
+                "bullets": p.get("bullets") or p.get("highlights") or [] if isinstance(p, dict) else [],
+                "highlights": p.get("highlights") or p.get("bullets") or [] if isinstance(p, dict) else [],
+                "link": p.get("link", "") if isinstance(p, dict) else "",
+            }
+            for p in (data.get("projects") or [])
+        ],
+        "education": [
+            {
+                "institution": e.get("institution", "") if isinstance(e, dict) else "",
+                "degree": e.get("degree", "") if isinstance(e, dict) else "",
+                "year": e.get("year", "") if isinstance(e, dict) else "",
+                "details": e.get("details", "") if isinstance(e, dict) else "",
+            }
+            for e in (data.get("education") or [])
+        ],
+    }
+
 # --- Health & Models Endpoints ---
 @app.get("/api/health")
 async def health_check():
@@ -100,26 +188,31 @@ def get_kb_stats():
 def get_kb_items():
     return vector_store.get_all_items()
 
+@app.get("/api/knowledge-base/profile")
+def get_kb_profile():
+    return vector_store.get_candidate_profile()
+
 @app.post("/api/knowledge-base/ingest-text")
 def ingest_text_endpoint(payload: IngestTextRequest):
     chunks = IngestionService.ingest_text(
         content=payload.content,
         title=payload.title,
-        category=payload.category,
+        category=payload.category or "raw_documents",
         tags=payload.tags
     )
     return {"message": f"Successfully ingested {chunks} chunks.", "chunks": chunks}
 
 @app.post("/api/knowledge-base/upload-resume-pdf")
 async def upload_resume_pdf(file: UploadFile = File(...)):
-    if not file.filename.lower().endswith(".pdf"):
+    filename = file.filename or "uploaded_resume.pdf"
+    if not filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Only PDF files are supported.")
     try:
         content = await file.read()
-        chunks = IngestionService.ingest_pdf_file(content, file.filename)
+        chunks = IngestionService.ingest_pdf_file(content, filename)
         stats = vector_store.get_stats()
         return {
-            "message": f"Successfully parsed and indexed {chunks} chunks from '{file.filename}' into ChromaDB!",
+            "message": f"Successfully parsed and indexed {chunks} chunks from '{filename}' into ChromaDB!",
             "chunks": chunks,
             "stats": stats
         }
@@ -158,33 +251,51 @@ async def tailor_resume(payload: TailorResumeRequest):
     if not payload.job_description.strip():
         raise HTTPException(status_code=400, detail="Job description cannot be empty.")
 
-    # 1. RAG Retrieval from ChromaDB
-    retrieval_output = rag_retriever.retrieve_context_for_jd(payload.job_description)
-    
-    # 2. Candidate basic info fallback
-    cand_info = {
-        "name": payload.candidate_name,
-        "email": payload.candidate_email,
-        "location": payload.candidate_location
-    }
+    # Check if Knowledge Base has any items
+    db_profile = vector_store.get_candidate_profile()
+    if not db_profile.get("exists"):
+        raise HTTPException(
+            status_code=400,
+            detail="Your Knowledge Base is empty! Please upload a PDF resume or complete the profile questionnaire before tailoring."
+        )
 
-    # 3. LLM Orchestration via Ollama (with resilient fallback)
-    tailored_resume = await resume_generator.generate_tailored_resume(
-        job_description=payload.job_description,
-        retrieved_context=retrieval_output["formatted_context"],
-        target_role=payload.target_role or "Software Engineer",
-        candidate_info=cand_info,
-        model=payload.model
-    )
+    try:
+        # 1. RAG Retrieval from ChromaDB
+        retrieval_output = rag_retriever.retrieve_context_for_jd(payload.job_description)
 
-    return {
-        "resume": tailored_resume,
-        "rag_context": {
-            "match_count": retrieval_output["match_count"],
-            "retrieved_items": retrieval_output["retrieved_items"],
-            "keywords": retrieval_output["extracted_keywords"]
+        # 2. Candidate basic info resolution (Explicit payload > ChromaDB stored identity)
+        c_meta = db_profile.get("candidate", {})
+        cand_info = {
+            "name": payload.candidate_name or c_meta.get("name") or "",
+            "email": payload.candidate_email or c_meta.get("email") or "",
+            "location": payload.candidate_location or c_meta.get("location") or "",
+            "linkedin": c_meta.get("linkedin") or "",
+            "github": c_meta.get("github") or "",
+            "portfolio": c_meta.get("portfolio") or ""
         }
-    }
+
+        # 3. LLM Orchestration via Ollama (with resilient fallback)
+        tailored_resume = await resume_generator.generate_tailored_resume(
+            job_description=payload.job_description,
+            retrieved_context=retrieval_output["formatted_context"],
+            target_role=payload.target_role or "Software Engineer",
+            candidate_info=cand_info,
+            model=payload.model
+        )
+
+        return {
+            "resume": tailored_resume,
+            "rag_context": {
+                "match_count": retrieval_output["match_count"],
+                "retrieved_items": retrieval_output["retrieved_items"],
+                "keywords": retrieval_output["extracted_keywords"]
+            }
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Unexpected error in /api/tailor: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Resume tailoring failed: {str(e)}")
 
 @app.post("/api/recommend-positions")
 async def recommend_positions_endpoint(payload: Optional[RecommendPositionsRequest] = None):
@@ -262,12 +373,66 @@ def scan_filesystem_endpoint(payload: FilesystemScanRequest):
         logger.error(f"Filesystem scan error: {e}")
         raise HTTPException(status_code=400, detail=str(e))
 
+@app.post("/api/connectors/linkedin/parse-csv")
+def parse_linkedin_csv_endpoint(payload: LinkedInSyncRequest):
+    try:
+        result = linkedin_connector.ingest_linkedin_archive({
+            "positions": payload.positions_csv or "",
+            "skills": payload.skills_csv or ""
+        })
+        return result
+    except Exception as e:
+        logger.error(f"LinkedIn CSV parse error: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.post("/api/connectors/vault/scan")
+def scan_vault_endpoint(payload: VaultScanRequest):
+    try:
+        result = vault_connector.scan_and_ingest_vault(
+            directory_path=payload.directory_path,
+            category=payload.category or "markdown_vault"
+        )
+        return result
+    except Exception as e:
+        logger.error(f"Markdown Vault scan error: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.post("/api/generate-cover-letter")
+async def generate_cover_letter_endpoint(payload: CoverLetterRequest):
+    if not payload.job_description.strip():
+        raise HTTPException(status_code=400, detail="Job description cannot be empty.")
+    try:
+        result = await resume_generator.generate_cover_letter(
+            job_description=payload.job_description,
+            target_role=payload.target_role or "Software Engineer",
+            model=payload.model
+        )
+        return result
+    except Exception as e:
+        logger.error(f"Cover letter generation error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/analyze-ats-gap")
+async def analyze_ats_gap_endpoint(payload: ATSAnalysisRequest):
+    if not payload.job_description.strip():
+        raise HTTPException(status_code=400, detail="Job description cannot be empty.")
+    try:
+        result = await resume_generator.analyze_ats_gap(
+            job_description=payload.job_description,
+            model=payload.model
+        )
+        return result
+    except Exception as e:
+        logger.error(f"ATS gap analysis error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 # --- PDF Export Endpoints ---
 @app.post("/api/export-pdf")
 async def export_pdf(payload: ExportPDFRequest):
     try:
+        clean_data = normalize_resume_data(payload.resume_data)
         pdf_path = await pdf_generator.generate_pdf(
-            resume_data=payload.resume_data,
+            resume_data=clean_data,
             template_name=payload.template or "modern"
         )
         return {
@@ -276,7 +441,7 @@ async def export_pdf(payload: ExportPDFRequest):
             "download_url": f"/api/download-pdf/{pdf_path.name}"
         }
     except Exception as e:
-        logger.error(f"Error generating PDF: {e}")
+        logger.error(f"Error generating PDF: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"PDF generation failed: {str(e)}")
 
 @app.get("/api/download-pdf/{filename}")
@@ -293,3 +458,4 @@ async def download_pdf(filename: str):
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+

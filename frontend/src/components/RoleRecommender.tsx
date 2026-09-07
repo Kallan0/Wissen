@@ -1,8 +1,10 @@
 "use client";
 
 import React, { useState } from "react";
-import { Compass, Sparkles, CheckCircle2, ArrowRight, Target, Lightbulb, AlertCircle } from "lucide-react";
-import { fetchCareerRecommendations } from "@/lib/api";
+import { Compass, Sparkles, CheckCircle2, ArrowRight, Target, Lightbulb, AlertCircle, Stamp, ScrollText } from "lucide-react";
+import EmptyKBBanner from "@/components/EmptyKBBanner";
+import ProfileQuestionnaireModal from "@/components/ProfileQuestionnaireModal";
+import { fetchCareerRecommendations, fetchKBProfile } from "@/lib/api";
 import { CareerRecommendationsResponse, RecommendedPosition } from "@/lib/types";
 
 interface RoleRecommenderProps {
@@ -18,6 +20,26 @@ export default function RoleRecommender({
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<CareerRecommendationsResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const [isKBEmpty, setIsKBEmpty] = useState(false);
+  const [isQuestionnaireOpen, setIsQuestionnaireOpen] = useState(false);
+
+  const checkKBStatus = async () => {
+    try {
+      const prof = await fetchKBProfile();
+      if (!prof.exists || prof.total_items === 0) {
+        setIsKBEmpty(true);
+      } else {
+        setIsKBEmpty(false);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  React.useEffect(() => {
+    checkKBStatus();
+  }, []);
 
   React.useEffect(() => {
     if (models.length > 0 && (!selectedModel || selectedModel === "llama3")) {
@@ -41,28 +63,43 @@ export default function RoleRecommender({
 
   return (
     <div className="space-y-6">
-      {/* Header Banner */}
-      <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-slate-100 mb-4">
+      {isKBEmpty && (
+        <EmptyKBBanner
+          onOpenQuestionnaire={() => setIsQuestionnaireOpen(true)}
+          onRefresh={checkKBStatus}
+        />
+      )}
+
+      {/* Editorial Header Banner */}
+      <div className="bg-[#fffdf9] p-6 sm:p-8 rounded-xl border-2 border-ink shadow-dossier relative overflow-hidden">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5 pb-5 border-b-2 border-ink/20 mb-5">
           <div>
-            <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-              <Compass className="w-5 h-5 text-indigo-600" />
-              AI Career Matcher & Position Recommender
+            <div className="flex items-center gap-2 mb-1">
+              <span className="font-mono text-[11px] uppercase tracking-widest bg-ink text-paper px-2 py-0.5 font-bold">
+                BUREAU OF CAREER MATCHES
+              </span>
+              <span className="font-mono text-[11px] text-ink-muted uppercase tracking-wider">
+                CHROMA-VECTOR PROVENANCE
+              </span>
+            </div>
+            <h2 className="text-2xl sm:text-3xl font-serif font-bold text-ink tracking-tight flex items-center gap-2.5">
+              <Compass className="w-6 h-6 text-terracotta" />
+              AI Career Matcher & Opportunity Dispatch
             </h2>
-            <p className="text-sm text-slate-500 mt-1">
-              The local AI analyzes your entire ChromaDB vector database (verified work history, projects, and skills) to identify the highest-fit positions you can target.
+            <p className="text-xs sm:text-sm font-serif italic text-ink-muted mt-1 max-w-2xl leading-relaxed">
+              The local Ollama AI scans your ChromaDB vector database (verified career history, projects, and skills) to identify the highest-fit positions you can target right now.
             </p>
           </div>
 
-          <div className="flex items-center gap-3 w-full sm:w-auto">
+          <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
             <select
               value={selectedModel}
               onChange={(e) => setSelectedModel(e.target.value)}
-              className="text-xs px-3 py-2 border border-slate-300 rounded-lg bg-white"
+              className="font-mono text-xs px-3 py-2 border-2 border-ink rounded bg-manila/50 text-ink focus:outline-none focus:ring-2 focus:ring-terracotta"
             >
               {models.map((m) => (
                 <option key={m} value={m}>
-                  {m}
+                  {m} (Active)
                 </option>
               ))}
             </select>
@@ -70,17 +107,17 @@ export default function RoleRecommender({
             <button
               onClick={handleAnalyze}
               disabled={loading}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white text-xs font-semibold rounded-lg shadow transition disabled:opacity-50"
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-terracotta hover:bg-[#b03d25] text-paper font-mono font-bold text-xs uppercase tracking-wider rounded-lg border-2 border-ink shadow-press hover:translate-x-[1px] hover:translate-y-[1px] transition-all disabled:opacity-50"
             >
               {loading ? (
                 <>
-                  <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  Scanning Vector DB...
+                  <div className="w-3.5 h-3.5 border-2 border-paper border-t-transparent rounded-full animate-spin" />
+                  SCANNED CHROMADB...
                 </>
               ) : (
                 <>
-                  <Sparkles className="w-3.5 h-3.5" />
-                  Suggest Roles For Me
+                  <Sparkles className="w-3.5 h-3.5 text-paper" />
+                  DISPATCH ROLE MATCHES
                 </>
               )}
             </button>
@@ -88,22 +125,22 @@ export default function RoleRecommender({
         </div>
 
         {error && (
-          <div className="p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 text-xs text-red-700">
-            <AlertCircle className="w-4 h-4 text-red-500" />
-            {error}
+          <div className="p-4 bg-[#fff0ed] border-2 border-terracotta rounded-lg flex items-center gap-2 text-xs text-terracotta shadow-press mb-4">
+            <AlertCircle className="w-4 h-4 text-terracotta shrink-0" />
+            <span className="font-mono">{error}</span>
           </div>
         )}
 
         {data?.profile_summary && (
-          <div className="p-4 bg-indigo-50/70 border border-indigo-100 rounded-xl text-xs text-indigo-900 leading-relaxed">
-            <span className="font-bold text-indigo-950 uppercase tracking-wide mr-1.5 flex items-center gap-1 inline-flex">
-              <Target className="w-3.5 h-3.5 text-indigo-600" />
+          <div className="p-4 bg-manila/60 border-2 border-ink rounded-lg font-serif text-xs text-ink leading-relaxed shadow-press">
+            <span className="font-mono font-bold text-ink uppercase tracking-wider mr-2 flex items-center gap-1.5 inline-flex">
+              <Target className="w-3.5 h-3.5 text-terracotta" />
               Verified Competency Assessment:
             </span>
             {data.profile_summary}
             {data._ai_provider && (
-              <div className="mt-1 text-[11px] text-indigo-600 font-medium">
-                Analysis Engine: {data._ai_provider}
+              <div className="mt-1.5 font-mono text-[10px] text-ink-muted uppercase">
+                INFERENCE ENGINE: <strong className="text-ink">{data._ai_provider}</strong>
               </div>
             )}
           </div>
@@ -116,34 +153,31 @@ export default function RoleRecommender({
           {data.recommended_positions.map((pos, idx) => (
             <div
               key={idx}
-              className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm hover:shadow-md hover:border-indigo-200 transition flex flex-col justify-between"
+              className="bg-[#fffdf9] p-6 rounded-xl border-2 border-ink shadow-press flex flex-col justify-between hover:shadow-dossier transition-all"
             >
               <div>
-                {/* Title & Score */}
-                <div className="flex items-start justify-between gap-2 mb-2">
+                {/* Header & Fit Postal Stamp */}
+                <div className="flex items-start justify-between gap-3 mb-3">
                   <div>
-                    <h3 className="text-base font-bold text-slate-900">{pos.title}</h3>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <span className="text-[11px] font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
-                        {pos.seniority}
-                      </span>
-                      <span className="text-xs text-slate-500">{pos.description}</span>
-                    </div>
+                    <span className="font-mono text-[9px] uppercase tracking-widest bg-ink text-paper px-2 py-0.5 font-bold inline-block mb-1">
+                      {pos.seniority}
+                    </span>
+                    <h3 className="text-lg font-serif font-bold text-ink">{pos.title}</h3>
+                    <p className="font-serif italic text-xs text-ink-muted mt-0.5">{pos.description}</p>
                   </div>
-                  <div className="shrink-0 text-right">
-                    <div className="text-lg font-black text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
-                      {pos.fit_score}% Fit
-                    </div>
+                  <div className="shrink-0 border-2 border-dashed border-terracotta px-2.5 py-1 rounded bg-manila/50 rotate-[2deg] text-center font-mono">
+                    <span className="text-sm font-black text-terracotta">{pos.fit_score}%</span>
+                    <span className="block text-[8px] uppercase tracking-wider text-ink-muted font-bold">FIT SCORE</span>
                   </div>
                 </div>
 
-                {/* Why Qualified */}
-                <div className="mt-3.5">
-                  <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1.5 flex items-center gap-1">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                    Why You're Qualified (From Your Data):
+                {/* Why Qualified Docket */}
+                <div className="mt-4 pt-3 border-t border-ink/20">
+                  <h4 className="font-mono text-[10px] font-bold uppercase tracking-wider text-ink mb-1.5 flex items-center gap-1">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-fountain-teal" />
+                    Verified Evidence from ChromaDB:
                   </h4>
-                  <ul className="list-disc list-inside space-y-1 text-xs text-slate-600">
+                  <ul className="list-disc list-inside space-y-1 font-serif text-xs text-ink/90">
                     {pos.why_qualified.map((reason, rIdx) => (
                       <li key={rIdx} className="leading-normal">
                         {reason}
@@ -154,39 +188,37 @@ export default function RoleRecommender({
 
                 {/* Skills Leveraged */}
                 {pos.skills_leveraged && pos.skills_leveraged.length > 0 && (
-                  <div className="mt-3">
-                    <div className="flex flex-wrap gap-1">
-                      {pos.skills_leveraged.map((s, sIdx) => (
-                        <span
-                          key={sIdx}
-                          className="bg-indigo-50 text-indigo-700 text-[10px] font-medium px-2 py-0.5 rounded border border-indigo-100"
-                        >
-                          {s}
-                        </span>
-                      ))}
-                    </div>
+                  <div className="mt-3.5 flex flex-wrap gap-1.5">
+                    {pos.skills_leveraged.map((s, sIdx) => (
+                      <span
+                        key={sIdx}
+                        className="bg-manila text-ink font-mono text-[10px] px-2 py-0.5 rounded border border-ink/30"
+                      >
+                        {s}
+                      </span>
+                    ))}
                   </div>
                 )}
 
                 {/* Recommended Focus */}
                 {pos.recommended_focus && (
-                  <div className="mt-3 p-2 bg-amber-50/70 border border-amber-200/70 rounded-lg text-xs text-amber-900 flex items-start gap-1.5">
-                    <Lightbulb className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
-                    <span>
-                      <strong>Application Angle:</strong> {pos.recommended_focus}
+                  <div className="mt-3.5 p-2.5 bg-paper border border-ink/30 rounded text-xs text-ink flex items-start gap-2">
+                    <Lightbulb className="w-3.5 h-3.5 text-vintage-gold shrink-0 mt-0.5" />
+                    <span className="font-serif">
+                      <strong className="font-mono text-[10px] uppercase">Application Angle:</strong> {pos.recommended_focus}
                     </span>
                   </div>
                 )}
               </div>
 
               {/* Action Button: One-Click Tailor */}
-              <div className="mt-5 pt-3 border-t border-slate-100 flex justify-end">
+              <div className="mt-5 pt-3 border-t-2 border-ink/20 flex justify-end">
                 <button
                   type="button"
                   onClick={() => onSelectRoleForTailoring(pos.title, pos.sample_jd_prompt)}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg shadow-sm transition"
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-terracotta hover:bg-[#b03d25] text-paper font-mono font-bold text-xs uppercase tracking-wider rounded border-2 border-ink shadow-press hover:translate-x-[1px] hover:translate-y-[1px] transition-all"
                 >
-                  Tailor Resume for this Role
+                  TAILOR DOSSIER FOR THIS ROLE
                   <ArrowRight className="w-3.5 h-3.5" />
                 </button>
               </div>
@@ -195,22 +227,29 @@ export default function RoleRecommender({
         </div>
       ) : (
         !loading && (
-          <div className="bg-white p-12 rounded-xl border border-slate-200 text-center shadow-sm">
-            <Compass className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-            <h3 className="text-base font-semibold text-slate-700">No Recommendations Yet</h3>
-            <p className="text-xs text-slate-500 max-w-md mx-auto mt-1 mb-4">
-              Click <strong>"Suggest Roles For Me"</strong> above. The local LLM will scan your ChromaDB knowledge base and identify the strongest job positions you qualify for.
+          <div className="bg-[#fffdf9] p-12 sm:p-16 rounded-xl border-2 border-ink shadow-dossier text-center">
+            <ScrollText className="w-12 h-12 text-ink-muted/40 mx-auto mb-3" />
+            <h3 className="text-lg font-serif font-bold text-ink">Awaiting Archive Analysis</h3>
+            <p className="font-serif italic text-xs text-ink-muted max-w-md mx-auto mt-1 mb-5">
+              Press <strong>"DISPATCH ROLE MATCHES"</strong> above. The local Ollama LLM will synthesize vector embeddings from your ChromaDB ledger to produce tailored position recommendations.
             </p>
             <button
               onClick={handleAnalyze}
-              className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg shadow transition"
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-terracotta hover:bg-[#b03d25] text-paper font-mono font-bold text-xs uppercase tracking-wider rounded-lg border-2 border-ink shadow-press"
             >
               <Sparkles className="w-3.5 h-3.5" />
-              Run Analysis Now
+              EXECUTE ANALYSIS NOW
             </button>
           </div>
         )
       )}
+
+      <ProfileQuestionnaireModal
+        isOpen={isQuestionnaireOpen}
+        onClose={() => setIsQuestionnaireOpen(false)}
+        onSuccess={checkKBStatus}
+      />
     </div>
   );
 }
+
