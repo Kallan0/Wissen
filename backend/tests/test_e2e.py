@@ -37,13 +37,38 @@ from fastapi.testclient import TestClient
 # ── Make sure the backend package root is on sys.path ────────────────────────
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BACKEND_DIR))
+TEST_CHROMA_DIR = BACKEND_DIR / "data" / "test_chroma_db"
+os.environ["CHROMA_DIR"] = str(TEST_CHROMA_DIR)
 
 # ── Import the FastAPI app (this initialises ChromaDB in-memory via config) ──
 from main import app  # noqa: E402
+from config import settings  # noqa: E402
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Fixtures
 # ─────────────────────────────────────────────────────────────────────────────
+
+@pytest.fixture(scope="session", autouse=True)
+def _mock_embeddings():
+    """Mock ChromaDB's ONNX embedding function so tests don't require external weights download or global ~/.cache writes."""
+    try:
+        from chromadb.utils.embedding_functions.onnx_mini_lm_l6_v2 import ONNXMiniLM_L6_V2
+        with patch.object(ONNXMiniLM_L6_V2, "__call__", side_effect=lambda input: [[0.05] * 384 for _ in input]):
+            yield
+    except Exception:
+        yield
+
+@pytest.fixture
+def tmp_path():
+    """Workspace-local temporary directory fixture for PDF export tests."""
+    temp_dir = BACKEND_DIR / "data" / "test_tmp"
+    temp_dir.mkdir(parents=True, exist_ok=True)
+    yield temp_dir
+    for f in temp_dir.glob("*"):
+        try:
+            f.unlink()
+        except Exception:
+            pass
 
 @pytest.fixture(scope="module")
 def client():
@@ -904,4 +929,3 @@ def test_get_candidate_profile_and_grounded_fallback(client):
     assert tailored_resume["experience"][0]["company"] == "CloudScale Inc"
     assert "Alex Morgan" not in str(tailored_resume)
     assert "TechNova" not in str(tailored_resume)
-

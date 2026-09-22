@@ -1,7 +1,7 @@
 import os
 import logging
 from pathlib import Path
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any
 from rag.ingestion import IngestionService
 from rag.vectorstore import vector_store
 

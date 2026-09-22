@@ -173,3 +173,26 @@ export interface VaultScanResult {
   total_chunks: number;
   processed_files: Array<{ title: string; path: string; chunks: number }>;
 }
+
+export interface ExportDatasetResult {
+  status: string;
+  count: number;
+  generated_count?: number;
+  holdout_count?: number;
+  filename: string;
+  file_size_bytes: number;
+  download_url: string;
+  holdout_filename?: string;
+  holdout_download_url?: string;
+}
+
+export interface FineTuningStatus {
+  installed_models: string[];
+  custom_models: string[];
+  base_models: string[];
+  has_custom_model_active: boolean;
+  toolkit: {
+    modelfile_available: boolean;
+    colab_notebook_available: boolean;
+  };
+}

@@ -9,8 +9,14 @@ from pathlib import Path
 # The default SelectorEventLoop on Windows cannot spawn subprocesses, which
 # Playwright needs to launch Chromium.  ProactorEventLoop supports both I/O
 # and subprocess creation, making it the correct choice for Windows.
-if sys.platform == "win32":
-    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+if sys.platform == "win32" and sys.version_info < (3, 14):
+    set_policy = getattr(asyncio, "set_event_loop_policy", None)
+    proactor_policy = getattr(asyncio, "WindowsProactorEventLoopPolicy", None)
+    if set_policy and proactor_policy:
+        try:
+            set_policy(proactor_policy())
+        except Exception:
+            pass
 # ─────────────────────────────────────────────────────────────────────────────
 
 from fastapi import FastAPI, HTTPException, Body, Query, UploadFile, File
@@ -166,8 +172,10 @@ def normalize_resume_data(data: Dict[str, Any]) -> Dict[str, Any]:
 # --- Health & Models Endpoints ---
 @app.get("/api/health")
 async def health_check():
-    ollama_info = await resume_generator.check_ollama_status()
-    db_stats = vector_store.get_stats()
+    ollama_info, db_stats = await asyncio.gather(
+        resume_generator.check_ollama_status(),
+        asyncio.to_thread(vector_store.get_stats),
+    )
     return {
         "status": "healthy",
         "ollama": ollama_info,
@@ -252,7 +260,7 @@ async def tailor_resume(payload: TailorResumeRequest):
         raise HTTPException(status_code=400, detail="Job description cannot be empty.")
 
     # Check if Knowledge Base has any items
-    db_profile = vector_store.get_candidate_profile()
+    db_profile = await asyncio.to_thread(vector_store.get_candidate_profile)
     if not db_profile.get("exists"):
         raise HTTPException(
             status_code=400,
@@ -261,7 +269,10 @@ async def tailor_resume(payload: TailorResumeRequest):
 
     try:
         # 1. RAG Retrieval from ChromaDB
-        retrieval_output = rag_retriever.retrieve_context_for_jd(payload.job_description)
+        retrieval_output = await asyncio.to_thread(
+            rag_retriever.retrieve_context_for_jd,
+            payload.job_description,
+        )
 
         # 2. Candidate basic info resolution (Explicit payload > ChromaDB stored identity)
         c_meta = db_profile.get("candidate", {})
@@ -302,7 +313,7 @@ async def recommend_positions_endpoint(payload: Optional[RecommendPositionsReque
     model_name = payload.model if payload else None
 
     # Gather verified background from ChromaDB
-    all_data = vector_store.get_all_items()
+    all_data = await asyncio.to_thread(vector_store.get_all_items)
     context_lines = []
 
     for category in ["experiences", "projects", "skills", "education", "raw_documents"]:
@@ -336,7 +347,7 @@ async def sync_github_endpoint(payload: GitHubSyncRequest):
             max_repos=payload.max_repos or 15,
             fetch_readme=payload.fetch_readme if payload.fetch_readme is not None else True
         )
-        stats = vector_store.get_stats()
+        stats = await asyncio.to_thread(vector_store.get_stats)
         return {"status": "success", "result": result, "stats": stats}
     except Exception as e:
         logger.error(f"GitHub sync error: {e}")
@@ -454,6 +465,88 @@ async def download_pdf(filename: str):
         filename=filename,
         media_type="application/pdf"
     )
+
+# --- Fine-Tuning & Custom Models Endpoints ---
+class ExportDatasetRequest(BaseModel):
+    count: int = Field(default=150, ge=100, le=200)
+    model: Optional[str] = Field(None, description="Installed Ollama model used to generate reviewed examples")
+
+@app.post("/api/finetuning/export-dataset")
+async def export_finetuning_dataset(payload: ExportDatasetRequest = ExportDatasetRequest()):
+    try:
+        from finetuning.dataset_generator import build_dataset
+        from finetuning.split_dataset import split_dataset
+        dataset_dir = settings.DATA_DIR / "finetuning"
+        dataset_dir.mkdir(parents=True, exist_ok=True)
+        generated_file = dataset_dir / "generated_dataset.jsonl"
+        training_file = dataset_dir / "training_data.jsonl"
+        holdout_file = dataset_dir / "holdout_eval.jsonl"
+
+        file_path_str = await asyncio.to_thread(
+            build_dataset,
+            payload.count,
+            str(generated_file),
+            payload.model,
+        )
+        training_count, holdout_count = await asyncio.to_thread(
+            split_dataset,
+            Path(file_path_str),
+            training_file,
+            holdout_file,
+            seed=42,
+            train_ratio=0.8,
+        )
+        file_size = os.path.getsize(training_file)
+
+        return {
+            "status": "success",
+            "count": training_count,
+            "generated_count": payload.count,
+            "holdout_count": holdout_count,
+            "filename": "training_data.jsonl",
+            "file_size_bytes": file_size,
+            "download_url": "/api/finetuning/download-dataset/training_data.jsonl",
+            "holdout_filename": "holdout_eval.jsonl",
+            "holdout_download_url": "/api/finetuning/download-dataset/holdout_eval.jsonl",
+        }
+    except Exception as e:
+        logger.error(f"Error generating fine-tuning dataset: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Dataset generation failed: {str(e)}")
+
+@app.get("/api/finetuning/download-dataset/{filename}")
+async def download_finetuning_dataset(filename: str):
+    file_path = settings.DATA_DIR / "finetuning" / filename
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="Dataset file not found. Please generate it first.")
+    return FileResponse(
+        path=str(file_path),
+        filename=filename,
+        media_type="application/jsonl"
+    )
+
+@app.get("/api/finetuning/status")
+async def get_finetuning_status():
+    try:
+        models = await resume_generator.get_available_models()
+        custom_models = [m for m in models if "resume" in m.lower() or "custom" in m.lower() or "tailor" in m.lower()]
+        base_models = [m for m in models if m not in custom_models]
+
+        colab_nb_exists = (settings.BASE_DIR / "finetuning" / "fine_tune_colab.ipynb").exists()
+        modelfile_exists = (settings.BASE_DIR / "finetuning" / "Modelfile").exists()
+
+        return {
+            "installed_models": models,
+            "custom_models": custom_models,
+            "base_models": base_models,
+            "has_custom_model_active": len(custom_models) > 0,
+            "toolkit": {
+                "modelfile_available": modelfile_exists,
+                "colab_notebook_available": colab_nb_exists
+            }
+        }
+    except Exception as e:
+        logger.error(f"Error fetching fine-tuning status: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Fine-tuning status check failed: {str(e)}")
 
 if __name__ == "__main__":
     import uvicorn

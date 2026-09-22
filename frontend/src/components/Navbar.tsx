@@ -11,7 +11,6 @@ import {
   RefreshCw,
   Menu,
   X,
-  LogIn,
 } from "lucide-react";
 import { HealthResponse } from "@/lib/types";
 
@@ -47,7 +46,7 @@ export default function Navbar({
       {/* 
         TOP HEADER:
         Matches Google Stitch layout.
-        Strictly includes ONLY the MCP logo, the name "Wissen", and the "Login" button.
+        Includes MCP logo, name "Wissen", and responsive mobile navigation drawer toggle.
       */}
       <header className="fixed top-0 left-0 right-0 lg:right-72 z-40 bg-[#fff8f4]/95 backdrop-blur-md border-b-2 border-ink shadow-[0_2px_0px_#221a12] h-16">
         <div className="h-full px-5 sm:px-8 flex items-center justify-between">
@@ -62,6 +61,17 @@ export default function Navbar({
               Wissen
             </span>
           </div>
+
+          {/* Mobile Menu Toggle Button */}
+          <button
+            type="button"
+            onClick={() => setMobileOpen(!mobileOpen)}
+            className="lg:hidden flex items-center gap-1.5 px-3 py-1.5 rounded border-2 border-ink bg-manila font-mono text-xs font-bold text-ink shadow-press hover:bg-terracotta hover:text-paper transition-all"
+            aria-label="Toggle Navigation Menu"
+          >
+            {mobileOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
+            <span className="uppercase text-[11px]">{mobileOpen ? "Close" : "Menu"}</span>
+          </button>
         </div>
       </header>
 
@@ -78,8 +88,9 @@ export default function Navbar({
         Fixed vertical aside matching the Stitch screen layout exactly.
       */}
       <aside
-        className={`fixed right-0 top-0 bottom-0 w-72 bg-manila border-l-2 border-ink shadow-[-3px_0_0px_#221a12] z-50 flex flex-col justify-between transition-transform duration-200 ease-in-out ${mobileOpen ? "translate-x-0" : "translate-x-full lg:translate-x-0"
-          }`}
+        className={`fixed right-0 top-0 bottom-0 w-72 bg-manila border-l-2 border-ink shadow-[-3px_0_0px_#221a12] z-50 flex flex-col justify-between transition-transform duration-200 ease-in-out ${
+          mobileOpen ? "translate-x-0" : "translate-x-full lg:translate-x-0"
+        }`}
       >
         <div className="p-6 flex flex-col gap-6">
           {/* Top Profile / Mode Header */}
@@ -99,9 +110,19 @@ export default function Navbar({
                 </span>
               </div>
             </div>
-            <span className="font-mono text-[10px] uppercase bg-[#fffdf9] px-2 py-0.5 rounded text-ink border-2 border-ink font-bold shadow-sm">
-              Ref. 08
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="font-mono text-[10px] uppercase bg-[#fffdf9] px-2 py-0.5 rounded text-ink border-2 border-ink font-bold shadow-sm">
+                Ref. 08
+              </span>
+              <button
+                type="button"
+                onClick={() => setMobileOpen(false)}
+                className="lg:hidden p-1 rounded hover:bg-terracotta hover:text-paper border border-ink text-ink transition-colors"
+                title="Close Drawer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
           </div>
 
           {/* Navigation Items (The App's Core Tabs) */}

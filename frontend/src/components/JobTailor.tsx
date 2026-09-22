@@ -1,11 +1,13 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Sparkles, Briefcase, FileCode, CheckCircle2, AlertCircle, ScrollText, Stamp, Tag } from "lucide-react";
+import { Sparkles, Briefcase, FileCode, CheckCircle2, AlertCircle, ScrollText, Stamp, Tag, Target, Mail } from "lucide-react";
 import EmptyKBBanner from "@/components/EmptyKBBanner";
 import ProfileQuestionnaireModal from "@/components/ProfileQuestionnaireModal";
-import { tailorResume, fetchKBProfile } from "@/lib/api";
-import { TailorResponse } from "@/lib/types";
+import ATSGapAnalyzer from "@/components/ATSGapAnalyzer";
+import CoverLetterModal from "@/components/CoverLetterModal";
+import { tailorResume, fetchKBProfile, analyzeATSGap, generateCoverLetter } from "@/lib/api";
+import { TailorResponse, ATSAnalysisResponse, CoverLetterResponse } from "@/lib/types";
 
 interface JobTailorProps {
   models: string[];
@@ -52,6 +54,15 @@ export default function JobTailor({ models, onTailored, initialRole, initialJd }
 
   const [isKBEmpty, setIsKBEmpty] = useState(false);
   const [isQuestionnaireOpen, setIsQuestionnaireOpen] = useState(false);
+
+  // ATS Gap Analysis State
+  const [atsData, setAtsData] = useState<ATSAnalysisResponse | null>(null);
+  const [atsLoading, setAtsLoading] = useState(false);
+
+  // Cover Letter & Outreach State
+  const [coverLetterData, setCoverLetterData] = useState<CoverLetterResponse | null>(null);
+  const [coverLetterLoading, setCoverLetterLoading] = useState(false);
+  const [isCoverLetterOpen, setIsCoverLetterOpen] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -110,6 +121,45 @@ export default function JobTailor({ models, onTailored, initialRole, initialJd }
       setError(err.message || "An error occurred during resume tailoring.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleAnalyzeATS = async () => {
+    if (!jobDescription.trim()) {
+      setError("Please enter a Job Description first to run the ATS Match Matrix.");
+      return;
+    }
+    setError(null);
+    setAtsLoading(true);
+    try {
+      const result = await analyzeATSGap(jobDescription, selectedModel);
+      setAtsData(result);
+    } catch (err: any) {
+      console.error(err);
+      setError(err.message || "ATS analysis failed.");
+    } finally {
+      setAtsLoading(false);
+    }
+  };
+
+  const handleOpenCoverLetter = async () => {
+    if (!jobDescription.trim()) {
+      setError("Please enter a Job Description first to generate a Cover Letter.");
+      return;
+    }
+    setError(null);
+    setIsCoverLetterOpen(true);
+    if (!coverLetterData) {
+      setCoverLetterLoading(true);
+      try {
+        const result = await generateCoverLetter(jobDescription, targetRole, selectedModel);
+        setCoverLetterData(result);
+      } catch (err: any) {
+        console.error(err);
+        setError(err.message || "Cover letter generation failed.");
+      } finally {
+        setCoverLetterLoading(false);
+      }
     }
   };
 
@@ -302,26 +352,75 @@ export default function JobTailor({ models, onTailored, initialRole, initialJd }
             </span>
           </div>
 
-          <button
-            type="button"
-            onClick={handleGenerate}
-            disabled={loading}
-            className="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 px-6 py-3.5 bg-terracotta hover:bg-[#b03d25] text-paper font-mono font-bold text-xs uppercase tracking-wider rounded-lg border-2 border-ink shadow-press-lg hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-press active:translate-x-[2px] active:translate-y-[2px] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {loading ? (
-              <>
-                <div className="w-4 h-4 border-2 border-paper border-t-transparent rounded-full animate-spin" />
-                <span>QUERYING CHROMADB & SYNTHESIZING...</span>
-              </>
-            ) : (
-              <>
-                <Sparkles className="w-4 h-4 text-paper" />
-                <span>EXECUTE PRESS & TAILOR RESUME</span>
-              </>
-            )}
-          </button>
+          <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+            <button
+              type="button"
+              onClick={handleAnalyzeATS}
+              disabled={atsLoading}
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-3 bg-manila hover:bg-[#ebd9c1] text-ink font-mono font-bold text-xs uppercase tracking-wider rounded-lg border-2 border-ink shadow-press hover:translate-x-[1px] hover:translate-y-[1px] transition-all disabled:opacity-50"
+              title="Analyze ATS Match Score and Missing Keywords"
+            >
+              {atsLoading ? (
+                <>
+                  <div className="w-3.5 h-3.5 border-2 border-ink border-t-transparent rounded-full animate-spin" />
+                  <span>ANALYZING ATS...</span>
+                </>
+              ) : (
+                <>
+                  <Target className="w-4 h-4 text-terracotta" />
+                  <span>ATS MATCH MATRIX</span>
+                </>
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={handleOpenCoverLetter}
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-3 bg-paper hover:bg-[#fffdf9] text-ink font-mono font-bold text-xs uppercase tracking-wider rounded-lg border-2 border-ink shadow-press hover:translate-x-[1px] hover:translate-y-[1px] transition-all"
+              title="Synthesize Grounded Cover Letter & Outreach"
+            >
+              <Mail className="w-4 h-4 text-terracotta" />
+              <span>COVER LETTER & OUTREACH</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleGenerate}
+              disabled={loading}
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 px-6 py-3 bg-terracotta hover:bg-[#b03d25] text-paper font-mono font-bold text-xs uppercase tracking-wider rounded-lg border-2 border-ink shadow-press-lg hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-press active:translate-x-[2px] active:translate-y-[2px] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loading ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-paper border-t-transparent rounded-full animate-spin" />
+                  <span>QUERYING CHROMADB & SYNTHESIZING...</span>
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-4 h-4 text-paper" />
+                  <span>EXECUTE PRESS & TAILOR RESUME</span>
+                </>
+              )}
+            </button>
+          </div>
         </div>
       </div>
+
+      {/* Render ATS Gap Analyzer Inline when analyzed */}
+      {atsData && (
+        <ATSGapAnalyzer
+          data={atsData}
+          loading={atsLoading}
+          onAnalyze={handleAnalyzeATS}
+        />
+      )}
+
+      {/* Cover Letter & Recruiter Outreach Modal */}
+      <CoverLetterModal
+        isOpen={isCoverLetterOpen}
+        onClose={() => setIsCoverLetterOpen(false)}
+        data={coverLetterData}
+        loading={coverLetterLoading}
+      />
 
       <ProfileQuestionnaireModal
         isOpen={isQuestionnaireOpen}

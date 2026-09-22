@@ -3,9 +3,9 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent
 DATA_DIR = BASE_DIR / "data"
-CHROMA_DIR = DATA_DIR / "chroma_db"
-PDF_DIR = DATA_DIR / "generated_pdfs"
-SAMPLE_DIR = BASE_DIR / "sample_data"
+CHROMA_DIR = Path(os.getenv("CHROMA_DIR", str(DATA_DIR / "chroma_db"))).expanduser().resolve()
+PDF_DIR = Path(os.getenv("PDF_DIR", str(DATA_DIR / "generated_pdfs"))).expanduser().resolve()
+SAMPLE_DIR = Path(os.getenv("SAMPLE_DIR", str(BASE_DIR / "sample_data"))).expanduser().resolve()
 
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 CHROMA_DIR.mkdir(parents=True, exist_ok=True)
@@ -13,6 +13,8 @@ PDF_DIR.mkdir(parents=True, exist_ok=True)
 SAMPLE_DIR.mkdir(parents=True, exist_ok=True)
 
 class Settings:
+    BASE_DIR: Path = BASE_DIR
+    DATA_DIR: Path = DATA_DIR
     CHROMA_DIR: Path = CHROMA_DIR
     PDF_DIR: Path = PDF_DIR
     SAMPLE_DIR: Path = SAMPLE_DIR

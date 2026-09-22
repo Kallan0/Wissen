@@ -44,7 +44,7 @@ class LinkedInConnector:
             if not bullets:
                 bullets = [f"Executed deliverables as {role} at {company}."]
 
-            IngestionService.ingest_work_experience_item(
+            IngestionService.ingest_experience_item(
                 company=company,
                 role=role,
                 duration=duration,

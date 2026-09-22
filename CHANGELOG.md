@@ -2,6 +2,69 @@
 
 All notable changes, architectural decisions, and version milestones for the **Local AI-Powered Resume Builder** are documented in this file. Detailed version logs can be found in the [`versions/`](file:///c:/Users/Joji/2026%20Exp/Resume_builder/versions/) directory.
 
+## [v1.14.0] - 2026-09-22
+
+### Summary
+Reduced backend cold-import time to about 0.8 seconds through lazy ChromaDB, Playwright, and PDF-parser loading; moved blocking database work off async request handlers; isolated E2E storage; removed the superseded QLoRA trainer and unused runtime dependencies; and cleaned regenerable build/cache artifacts. See [`versions/v1.14.0.md`](versions/v1.14.0.md).
+
+---
+
+## [v1.13.0] - 2026-09-22
+
+### Summary
+Added fail-fast Hugging Face gated-model authorization checks to training and preflight, documented secure environment-scoped login, and replaced the prior long download traceback with actionable recovery guidance. See [`versions/v1.13.0.md`](versions/v1.13.0.md).
+
+---
+
+## [v1.12.0] - 2026-09-21
+
+### Summary
+Fixed evaluation failure accounting, diagnosed the 30-request baseline as invalid because Ollama was offline, and added QLoRA preflight checks for dataset isolation, hashes, dependencies, CUDA, disk space, and artifact paths. See [`versions/v1.12.0.md`](versions/v1.12.0.md).
+
+---
+
+## [v1.11.0] - 2026-09-21
+
+### Summary
+Recorded 30/30 manual dataset acceptances and implemented the untouched-holdout Ollama evaluation harness with reproducible settings, raw-output capture, latency measurement, schema scoring, and factual/static-profile checks. See [`versions/v1.11.0.md`](versions/v1.11.0.md).
+
+---
+
+## [v1.10.0] - 2026-09-21
+
+### Summary
+Completed Phase 1 dataset-audit automation with static profile checks, leakage detection, unsupported-number warnings, duplicate analysis, machine-readable reports, and a balanced 30-record manual-review packet. The current dataset has zero hard errors and awaits manual factual approval. See [`versions/v1.10.0.md`](versions/v1.10.0.md).
+
+---
+
+## [v1.9.0] - 2026-09-21
+
+### Summary
+Added a phased fine-tuning implementation plan with explicit Codex/manual ownership, factual-safety gates, baseline and holdout evaluation requirements, training/export steps, application integration work, and rollback controls. See [`backend/finetuning/NEXT_STEPS_PLAN.md`](backend/finetuning/NEXT_STEPS_PLAN.md) and [`versions/v1.9.0.md`](versions/v1.9.0.md).
+
+---
+
+## [v1.8.0] - 2026-09-21
+
+### Summary
+Made candidate identity and static resume metadata deterministic in Python, deduplicated prompt context, added bounded local parallel generation, and successfully produced 150 validated examples split into 120 training and 30 zero-overlap holdout records. See [`versions/v1.8.0.md`](versions/v1.8.0.md).
+
+---
+
+## [v1.7.0] - 2026-09-21
+
+### Summary
+Overhauled dataset generation to remove synthetic-persona fallbacks, require verified name/experience/skills, generate grounded variations for backend, frontend, and UI/UX roles through Ollama, and create deterministic 80/20 training and holdout datasets. The attempted 150-record run safely stopped because the live profile lacks a verified name and experience. See [`versions/v1.7.0.md`](versions/v1.7.0.md).
+
+---
+
+## [v1.6.0] - 2026-09-21
+
+### Summary
+Completed a repository-wide technical audit and added a validated Llama 3 QLoRA implementation with dataset schema checks, placeholder rejection, deduplication, deterministic evaluation splitting, isolated training dependencies, reproducibility manifests, and unit coverage. See [`versions/v1.6.0.md`](versions/v1.6.0.md) and [`AUDIT.md`](AUDIT.md).
+
+---
+
 ## [v1.5.0] - 2026-09-04
 
 ### Summary

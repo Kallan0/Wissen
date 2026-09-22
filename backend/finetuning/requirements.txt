@@ -1,0 +1,9 @@
+# Keep training dependencies isolated from the runtime API environment.
+# Tested API shape: TRL SFTConfig/SFTTrainer with PEFT QLoRA.
+torch>=2.4,<3
+transformers>=4.46,<6
+datasets>=3,<5
+accelerate>=1,<2
+peft>=0.13,<1
+trl>=0.22,<1
+bitsandbytes>=0.44,<1

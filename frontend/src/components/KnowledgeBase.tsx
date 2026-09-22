@@ -291,31 +291,6 @@ export default function KnowledgeBase({ onRefreshStats }: KnowledgeBaseProps) {
             </button>
           </form>
         </div>
-
-        {/* GitHub Ingestion & File Ingest Info */}
-        <div className="bg-[#fffdf9] p-6 rounded-xl border-2 border-ink shadow-press space-y-4">
-          <h3 className="font-serif text-lg font-bold text-ink flex items-center gap-2 mb-1">
-            <Github className="w-4 h-4 text-terracotta" />
-            CLI Automation Script
-          </h3>
-          <p className="font-serif italic text-xs text-ink-muted leading-relaxed">
-            You can automatically index all your public GitHub repositories, stars, languages, and README summaries into ChromaDB using the included CLI script:
-          </p>
-
-          <div className="bg-ink text-paper p-3.5 rounded-lg font-mono text-xs overflow-x-auto border-2 border-ink">
-            <code>backend\venv\Scripts\python backend/scripts/ingest_github.py your_username</code>
-          </div>
-
-          <div className="border-t-2 border-ink/20 pt-4">
-            <h4 className="font-mono text-xs font-bold uppercase tracking-wider text-ink mb-1 flex items-center gap-1.5">
-              <Stamp className="w-3.5 h-3.5 text-terracotta" />
-              100% Zero-Cloud Privacy Guarantee
-            </h4>
-            <p className="font-serif text-xs text-ink-muted leading-relaxed">
-              Neither your resume, job descriptions, nor vector embeddings leave your device. All vectors are stored in <code className="font-mono bg-manila px-1.5 py-0.5 rounded border border-ink/20">backend/data/chroma_db</code> and evaluated locally with local HuggingFace embeddings and local Ollama models.
-            </p>
-          </div>
-        </div>
       </div>
 
       {/* Stored Items Viewer */}

@@ -1,9 +1,6 @@
 from typing import List, Dict, Any, Optional
-import os
-import json
 import logging
 import io
-from pypdf import PdfReader
 from rag.vectorstore import vector_store
 
 logger = logging.getLogger("resume_rag.ingestion")
@@ -42,6 +39,8 @@ class IngestionService:
     @staticmethod
     def ingest_pdf_file(file_bytes: bytes, filename: str) -> int:
         """Extracts text from an uploaded resume PDF and indexes it into ChromaDB."""
+        from pypdf import PdfReader
+
         reader = PdfReader(io.BytesIO(file_bytes))
         extracted_pages = []
         for p_idx, page in enumerate(reader.pages):
@@ -71,7 +70,7 @@ class IngestionService:
     ) -> List[str]:
         """Ingests work experience items into ChromaDB."""
         texts = []
-        metas = []
+        metas: List[Dict[str, Any]] = []
         tech_str = ", ".join(technologies or [])
         
         # High-level overview chunk
@@ -100,6 +99,9 @@ class IngestionService:
 
         return vector_store.add_items("experiences", texts=texts, metadatas=metas)
 
+    # Backward-compatible alias
+    ingest_work_experience_item = ingest_experience_item
+
     @staticmethod
     def ingest_project_item(
         name: str,
@@ -111,7 +113,7 @@ class IngestionService:
         """Ingests portfolio, software, Unity/Blender or Github projects."""
         tech_str = ", ".join(technologies)
         texts = []
-        metas = []
+        metas: List[Dict[str, Any]] = []
 
         overview = f"Project: {name}. Description: {description}. Stack: {tech_str}. Highlights: " + " ".join(highlights)
         texts.append(overview)
@@ -200,6 +202,32 @@ class IngestionService:
                 details=edu.get("details", "")
             )
             counts["education"] += len(ids)
+
+        # Candidate identity & contact metadata
+        contact = profile_data.get("contact") if isinstance(profile_data.get("contact"), dict) else {}
+        name = profile_data.get("name") or contact.get("name") or ""
+        email = contact.get("email") or profile_data.get("email") or ""
+        phone = contact.get("phone") or profile_data.get("phone") or ""
+        loc = contact.get("location") or profile_data.get("location") or ""
+        linkedin = contact.get("linkedin") or profile_data.get("linkedin") or ""
+        github = contact.get("github") or profile_data.get("github") or ""
+        portfolio = contact.get("portfolio") or profile_data.get("portfolio") or ""
+
+        if name or email:
+            contact_text = f"Candidate Profile: {name} | Email: {email} | Phone: {phone} | Location: {loc} | LinkedIn: {linkedin} | GitHub: {github} | Portfolio: {portfolio}"
+            contact_meta = {
+                "category": "candidate_identity",
+                "candidate_name": name,
+                "name": name,
+                "email": email,
+                "phone": phone,
+                "location": loc,
+                "linkedin": linkedin,
+                "github": github,
+                "portfolio": portfolio
+            }
+            vector_store.add_items("raw_documents", texts=[contact_text], metadatas=[contact_meta])
+            counts["raw_documents"] += 1
 
         # Bio or summary
         if profile_data.get("summary"):

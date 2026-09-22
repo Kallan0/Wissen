@@ -55,8 +55,8 @@ cd backend
 python -m venv venv
 source venv/bin/activate  # On Windows use `venv\Scripts\activate`
 
-# Install dependencies
-pip install fastapi uvicorn langchain langchain-community chromadb fastembed pydantic
+# Install the tested runtime dependencies
+pip install -r requirements.txt
 
 # Run the API server
 uvicorn main:app --reload --port 8000
@@ -78,33 +78,27 @@ npm run dev
 
 ## Data Ingestion & Integrations
 
-To populate your RAG database, you will create modular Python scripts to parse various data sources:
+Populate the local knowledge base through the web UI or the existing connectors:
 
-- **GitHub:** Use `PyGithub` to pull READMEs, repository descriptions, and language statistics.
-- **Canva / UI/UX:** Export design metadata or project briefs to JSON/Markdown and embed.
-- **Unity / Blender:** Write local filesystem parsers to read project directory structures, `.meta` files, or custom `project_summary.txt` files inside your workflow directories.
+- **Resume PDF:** Upload a resume and extract its text locally.
+- **GitHub:** Pull repository descriptions, language statistics, topics, and README summaries.
+- **Canva / UI/UX:** Add structured design-project evidence.
+- **Local projects and note vaults:** Scan selected Unity, Blender, code, Markdown, or text directories.
 
 ### Example Ingestion Script
 ```python
-from langchain_community.vectorstores import Chroma
-from langchain_community.embeddings import FastEmbedEmbeddings
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+from rag.ingestion import IngestionService
 
-# Load your personal data documents here
 raw_text = "I am a full-stack developer with experience in Next.js, Python, and UI/UX design..."
-
-text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
-chunks = text_splitter.split_text(raw_text)
-
-db = Chroma.from_texts(
-    texts=chunks, 
-    embedding=FastEmbedEmbeddings(), 
-    persist_directory="./chroma_db"
+chunks_added = IngestionService.ingest_text(
+    content=raw_text,
+    title="Professional profile",
+    tags=["profile"],
 )
-print("Data ingested successfully!")
+print(f"Indexed {chunks_added} chunks")
 ```
 
 ## Future Roadmap
-- [ ] Add PDF parsing to automatically ingest old versions of your resume.
-- [ ] Build a template selector in the Next.js frontend.
 - [ ] Implement iterative refinement (letting the LLM critique its own generated resume against the JD before finalizing).
+- [ ] Add authenticated access before exposing the backend beyond localhost.
+- [ ] Complete evaluated adapter merge, GGUF conversion, and rollback automation.

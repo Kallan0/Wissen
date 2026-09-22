@@ -8,6 +8,11 @@ import {
   GitHubSyncResult,
   CanvaProjectPayload,
   FilesystemScanResult,
+  VaultScanResult,
+  CoverLetterResponse,
+  ATSAnalysisResponse,
+  ExportDatasetResult,
+  FineTuningStatus,
 } from "./types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -271,5 +276,24 @@ export async function analyzeATSGap(
     const err = await res.text();
     throw new Error(err || "Failed to analyze ATS Gap");
   }
+  return res.json();
+}
+
+export async function exportFineTuningDataset(count = 150): Promise<ExportDatasetResult> {
+  const res = await fetch(`${API_BASE}/api/finetuning/export-dataset`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ count }),
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(err || "Failed to export fine-tuning dataset");
+  }
+  return res.json();
+}
+
+export async function fetchFineTuningStatus(): Promise<FineTuningStatus> {
+  const res = await fetch(`${API_BASE}/api/finetuning/status`);
+  if (!res.ok) throw new Error("Failed to fetch fine-tuning status");
   return res.json();
 }

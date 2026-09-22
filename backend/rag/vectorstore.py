@@ -1,8 +1,7 @@
-import chromadb
-from chromadb import Settings as ChromaSettings
 from typing import List, Dict, Any, Optional
 import uuid
 import logging
+import threading
 from config import settings
 
 logger = logging.getLogger("resume_rag.vectorstore")
@@ -12,11 +11,15 @@ class ChromaManager:
 
     def __new__(cls):
         if cls._instance is None:
-            cls._instance = super(ChromaManager, cls).__new__(cls)
-            cls._instance._init_client()
+            instance = super(ChromaManager, cls).__new__(cls)
+            instance._init_client()
+            cls._instance = instance
         return cls._instance
 
     def _init_client(self):
+        import chromadb
+        from chromadb import Settings as ChromaSettings
+
         self.client = chromadb.PersistentClient(
             path=str(settings.CHROMA_DIR),
             settings=ChromaSettings(anonymized_telemetry=False)
@@ -71,7 +74,7 @@ class ChromaManager:
 
     def query(self, query_text: str, collection_names: Optional[List[str]] = None, n_results: int = 5) -> List[Dict[str, Any]]:
         target_collections = collection_names or ["experiences", "projects", "skills", "education", "raw_documents"]
-        combined_results = []
+        combined_results: List[Dict[str, Any]] = []
 
         for name in target_collections:
             try:
@@ -106,8 +109,14 @@ class ChromaManager:
                 logger.warning("Skipping collection '%s' during query due to error: %s", name, e)
                 continue
 
+        def _get_similarity(item: Dict[str, Any]) -> float:
+            val = item.get("similarity", 0.0)
+            if isinstance(val, (int, float)):
+                return float(val)
+            return 0.0
+
         # Sort combined results by similarity descending
-        combined_results.sort(key=lambda x: x["similarity"], reverse=True)
+        combined_results.sort(key=_get_similarity, reverse=True)
         return combined_results[:n_results]
 
     def get_stats(self) -> Dict[str, Any]:
@@ -179,7 +188,12 @@ class ChromaManager:
                 doc = item.get("document") or ""
 
                 # Extract contact attributes if present in metadata
-                for key in ["name", "email", "phone", "location", "linkedin", "github", "portfolio"]:
+                if meta.get("candidate_name"):
+                    candidate["name"] = str(meta["candidate_name"]).strip()
+                elif not candidate["name"] and cat != "projects" and meta.get("name"):
+                    candidate["name"] = str(meta["name"]).strip()
+
+                for key in ["email", "phone", "location", "linkedin", "github", "portfolio"]:
                     if not candidate[key] and meta.get(key):
                         candidate[key] = str(meta[key]).strip()
 
@@ -248,4 +262,61 @@ class ChromaManager:
                 pass
         self._init_client()
 
-vector_store = ChromaManager()
+class LazyChromaManager:
+    """Initialize ChromaDB only when a knowledge-base operation needs it."""
+
+    def __init__(self) -> None:
+        self._manager: Optional[ChromaManager] = None
+        self._lock = threading.Lock()
+
+    def _get_manager(self) -> ChromaManager:
+        if self._manager is None:
+            with self._lock:
+                if self._manager is None:
+                    self._manager = ChromaManager()
+        return self._manager
+
+    @property
+    def is_initialized(self) -> bool:
+        return self._manager is not None
+
+    def get_collection(self, name: str):
+        return self._get_manager().get_collection(name)
+
+    def add_items(
+        self,
+        collection_name: str,
+        texts: List[str],
+        metadatas: Optional[List[Dict[str, Any]]] = None,
+        ids: Optional[List[str]] = None,
+    ):
+        return self._get_manager().add_items(collection_name, texts, metadatas, ids)
+
+    def query(
+        self,
+        query_text: str,
+        collection_names: Optional[List[str]] = None,
+        n_results: int = 5,
+    ):
+        return self._get_manager().query(query_text, collection_names, n_results)
+
+    def get_stats(self):
+        return self._get_manager().get_stats()
+
+    def get_all_items(self):
+        return self._get_manager().get_all_items()
+
+    def get_candidate_profile(self):
+        return self._get_manager().get_candidate_profile()
+
+    def delete_item(self, collection_name: str, item_id: str):
+        return self._get_manager().delete_item(collection_name, item_id)
+
+    def clear_all(self):
+        return self._get_manager().clear_all()
+
+    def __getattr__(self, name: str):
+        return getattr(self._get_manager(), name)
+
+
+vector_store = LazyChromaManager()

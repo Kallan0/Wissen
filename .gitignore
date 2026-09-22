@@ -8,8 +8,10 @@ __pycache__/
 *$py.class
 
 # --- User Data & Generated Files (Privacy First) ---
-backend/data/chroma_db/
-backend/data/generated_pdfs/
+backend/data/
+backend/finetuning/artifacts/
+backend/finetuning/training_data.jsonl
+backend/finetuning/*.gguf
 *.pdf
 
 # --- Node.js & Next.js ---
@@ -19,6 +21,7 @@ frontend/.next/
 .next/
 frontend/out/
 out/
+frontend/*.tsbuildinfo
 *.log
 npm-debug.log*
 yarn-debug.log*
@@ -37,4 +40,6 @@ Thumbs.db
 desktop.ini
 .vscode/
 .idea/
-*.swp
+*.swp
+.pytest_cache/
+pytest-cache-files-*/

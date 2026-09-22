@@ -3,7 +3,6 @@ import asyncio
 import logging
 from pathlib import Path
 from jinja2 import Template
-from playwright.sync_api import sync_playwright
 from config import settings
 from pdf.templates import TEMPLATES, MODERN_TEMPLATE
 
@@ -27,6 +26,8 @@ class PDFGenerator:
         the Windows SelectorEventLoop limitation where asyncio cannot spawn
         subprocesses (NotImplementedError from asyncio.create_subprocess_exec).
         """
+        from playwright.sync_api import sync_playwright
+
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
             page = browser.new_page()

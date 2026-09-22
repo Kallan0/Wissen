@@ -111,7 +111,7 @@ export default function ProfileQuestionnaireModal({
       // Parse skills string into skill categories
       const skillItems = skillsStr
         .split(",")
-        .map((s) => s.strip ? s.strip() : s.trim())
+        .map((s) => s.trim())
         .filter(Boolean);
 
       const payload = {
