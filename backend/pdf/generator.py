@@ -2,11 +2,15 @@ import uuid
 import asyncio
 import logging
 from pathlib import Path
-from jinja2 import Template
+from jinja2 import Environment, select_autoescape
 from config import settings
 from pdf.templates import TEMPLATES, MODERN_TEMPLATE
 
 logger = logging.getLogger("resume_rag.pdf")
+
+_template_environment = Environment(
+    autoescape=select_autoescape(default_for_string=True, default=True),
+)
 
 
 class PDFGenerator:
@@ -16,7 +20,7 @@ class PDFGenerator:
 
     def render_html(self, resume_data: dict, template_name: str = "modern") -> str:
         template_str = TEMPLATES.get(template_name.lower(), MODERN_TEMPLATE)
-        jinja_template = Template(template_str)
+        jinja_template = _template_environment.from_string(template_str)
         return jinja_template.render(**resume_data)
 
     def _generate_pdf_sync(self, html_content: str, output_path: Path) -> None:

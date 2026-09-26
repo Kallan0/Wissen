@@ -4,10 +4,11 @@
   "description": "Local AI-Powered Privacy-First Resume Builder",
   "private": true,
   "scripts": {
-    "dev:backend": "backend\\venv\\Scripts\\python.exe -m uvicorn main:app --reload --port 8000 --app-dir backend",
+    "dev:backend": "backend\\venv\\Scripts\\python.exe -m uvicorn main:app --reload --port 8001 --app-dir backend",
     "dev:frontend": "npm --prefix frontend run dev",
     "dev:ollama": "ollama serve",
-    "dev": "concurrently -k -p \"[{name}]\" -n \"OLLAMA,BACKEND,FRONTEND\" -c \"green.bold,blue.bold,magenta.bold\" \"npm run dev:ollama\" \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev": "node scripts/dev.js",
+    "dev:check": "node scripts/dev.js --check",
     "start": "npm run dev",
     "seed": "backend\\venv\\Scripts\\python.exe backend/scripts/ingest_sample.py"
   },

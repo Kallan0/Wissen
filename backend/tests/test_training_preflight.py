@@ -43,6 +43,7 @@ def test_preflight_reports_model_access_failure(tmp_path, monkeypatch):
         holdout,
         tmp_path / "artifacts" / "adapter",
         min_free_gb=0,
+        min_vram_gb=0,
         base_model="meta-llama/Meta-Llama-3-8B-Instruct",
     )
 

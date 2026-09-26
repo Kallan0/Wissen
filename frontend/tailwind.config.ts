@@ -1,6 +1,7 @@
 import type { Config } from "tailwindcss";
 
 const config: Config = {
+  darkMode: "class",
   content: [
     "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
@@ -9,22 +10,22 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        paper: "#fff8f4",
-        "paper-sheet": "#fffdf9",
-        manila: "#fcebdd",
-        "manila-high": "#f6e5d7",
-        "manila-low": "#fff1e6",
-        ink: "#221a12",
-        "ink-muted": "#58413c",
-        "ink-outline": "#8c716b",
-        "ink-light": "#e0bfb9",
-        terracotta: "#c84b31",
-        "terracotta-dark": "#a6331b",
-        "fountain-teal": "#286864",
-        "teal-light": "#afeee9",
-        "vintage-gold": "#d99b26",
-        "vintage-gold-dark": "#7c5400",
-        "gold-light": "#ffdeae",
+        paper: "rgb(var(--paper) / <alpha-value>)",
+        "paper-sheet": "rgb(var(--paper-sheet) / <alpha-value>)",
+        manila: "rgb(var(--manila) / <alpha-value>)",
+        "manila-high": "rgb(var(--manila-high) / <alpha-value>)",
+        "manila-low": "rgb(var(--manila-low) / <alpha-value>)",
+        ink: "rgb(var(--ink) / <alpha-value>)",
+        "ink-muted": "rgb(var(--ink-muted) / <alpha-value>)",
+        "ink-outline": "rgb(var(--ink-outline) / <alpha-value>)",
+        "ink-light": "rgb(var(--ink-light) / <alpha-value>)",
+        terracotta: "rgb(var(--terracotta) / <alpha-value>)",
+        "terracotta-dark": "rgb(var(--terracotta-dark) / <alpha-value>)",
+        "fountain-teal": "rgb(var(--fountain-teal) / <alpha-value>)",
+        "teal-light": "rgb(var(--teal-light) / <alpha-value>)",
+        "vintage-gold": "rgb(var(--vintage-gold) / <alpha-value>)",
+        "vintage-gold-dark": "rgb(var(--vintage-gold-dark) / <alpha-value>)",
+        "gold-light": "rgb(var(--gold-light) / <alpha-value>)",
       },
       fontFamily: {
         headline: ["Newsreader", "Georgia", "serif"],
@@ -32,11 +33,11 @@ const config: Config = {
         typewriter: ["'Courier Prime'", "Courier", "monospace"],
       },
       boxShadow: {
-        stamp: "1px 1px 0px #221a12",
-        press: "2px 2px 0px #221a12",
-        "press-md": "3px 3px 0px #221a12",
-        "press-lg": "4px 4px 0px #221a12",
-        dossier: "6px 6px 0px #221a12",
+        stamp: "1px 1px 0px rgb(var(--shadow-ink))",
+        press: "2px 2px 0px rgb(var(--shadow-ink))",
+        "press-md": "3px 3px 0px rgb(var(--shadow-ink))",
+        "press-lg": "4px 4px 0px rgb(var(--shadow-ink))",
+        dossier: "6px 6px 0px rgb(var(--shadow-ink))",
       },
     },
   },

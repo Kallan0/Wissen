@@ -2,7 +2,7 @@ import os
 import sys
 import asyncio
 import logging
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Literal, Optional
 from pathlib import Path
 
 # ── Windows asyncio fix ───────────────────────────────────────────────────────
@@ -21,12 +21,13 @@ if sys.platform == "win32" and sys.version_info < (3, 14):
 
 from fastapi import FastAPI, HTTPException, Body, Query, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel, Field
 
 from config import settings
 from rag.vectorstore import vector_store
 from rag.ingestion import IngestionService
+from rag.profile_normalization import normalize_profile_submission
 from rag.retriever import rag_retriever
 from ai.generator import resume_generator
 from pdf.generator import pdf_generator
@@ -92,7 +93,7 @@ class FilesystemScanRequest(BaseModel):
 
 class ExportPDFRequest(BaseModel):
     resume_data: Dict[str, Any] = Field(..., description="Structured resume JSON")
-    template: Optional[str] = "modern"
+    template: Literal["modern", "minimal", "vintage"] = "modern"
 
 class LinkedInSyncRequest(BaseModel):
     positions_csv: Optional[str] = Field(None, description="Raw Positions.csv content")
@@ -230,8 +231,12 @@ async def upload_resume_pdf(file: UploadFile = File(...)):
 
 @app.post("/api/knowledge-base/ingest-profile")
 def ingest_profile_endpoint(payload: Dict[str, Any] = Body(...)):
-    counts = IngestionService.ingest_structured_profile(payload)
-    return {"message": "Profile successfully indexed into ChromaDB", "indexed": counts}
+    try:
+        normalized_profile = normalize_profile_submission(payload)
+        counts = IngestionService.ingest_structured_profile(normalized_profile)
+        return {"message": "Profile successfully indexed into ChromaDB", "indexed": counts}
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error))
 
 @app.post("/api/knowledge-base/seed-sample")
 def seed_sample_endpoint():
@@ -438,6 +443,22 @@ async def analyze_ats_gap_endpoint(payload: ATSAnalysisRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 # --- PDF Export Endpoints ---
+@app.post("/api/render-resume-html", response_class=HTMLResponse)
+async def render_resume_html(payload: ExportPDFRequest):
+    """Render the same backend-owned template used for PDF export."""
+    try:
+        clean_data = normalize_resume_data(payload.resume_data)
+        return HTMLResponse(
+            content=pdf_generator.render_html(
+                resume_data=clean_data,
+                template_name=payload.template or "modern",
+            )
+        )
+    except Exception as e:
+        logger.error(f"Error rendering resume preview: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Resume preview failed: {str(e)}")
+
+
 @app.post("/api/export-pdf")
 async def export_pdf(payload: ExportPDFRequest):
     try:
@@ -550,5 +571,5 @@ async def get_finetuning_status():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=8001, reload=True)
 

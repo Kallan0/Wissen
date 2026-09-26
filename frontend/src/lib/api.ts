@@ -15,7 +15,7 @@ import {
   FineTuningStatus,
 } from "./types";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001";
 
 export async function fetchHealth(): Promise<HealthResponse> {
   const res = await fetch(`${API_BASE}/api/health`);
@@ -54,7 +54,10 @@ export async function ingestProfile(payload: any): Promise<{ message: string; in
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
-  if (!res.ok) throw new Error("Failed to ingest structured profile");
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.detail || "Failed to ingest structured profile");
+  }
   return res.json();
 }
 
@@ -139,6 +142,24 @@ export async function exportPDF(resumeData: ResumeData, template = "modern"): Pr
     throw new Error(`PDF export failed: ${err}`);
   }
   return res.json();
+}
+
+export async function renderResumeHTML(
+  resumeData: ResumeData,
+  template = "modern",
+  signal?: AbortSignal
+): Promise<string> {
+  const res = await fetch(`${API_BASE}/api/render-resume-html`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ resume_data: resumeData, template }),
+    signal,
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(err || "Failed to render resume preview");
+  }
+  return res.text();
 }
 
 export function getDownloadUrl(filename: string): string {

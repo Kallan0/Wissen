@@ -25,7 +25,7 @@ export default function ProfileQuestionnaireModal({
   const [summary, setSummary] = useState("");
 
   // Skills
-  const [skillsStr, setSkillsStr] = useState("Python, TypeScript, FastAPI, React, Next.js, PostgreSQL, Docker, Git");
+  const [skillsStr, setSkillsStr] = useState("");
 
   // Experience items
   const [experiences, setExperiences] = useState([
@@ -108,57 +108,24 @@ export default function ProfileQuestionnaireModal({
     setLoading(true);
 
     try {
-      // Parse skills string into skill categories
-      const skillItems = skillsStr
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean);
-
       const payload = {
-        name: name.trim(),
-        title: title.trim() || "Software Engineer",
+        name,
+        title,
         contact: {
-          email: email.trim(),
-          phone: phone.trim(),
-          location: location.trim(),
-          linkedin: linkedin.trim(),
-          github: github.trim(),
+          email,
+          phone,
+          location,
+          linkedin,
+          github,
         },
-        summary: summary.trim(),
-        skills: [
-          {
-            category: "Core Technical Competencies",
-            items: skillItems.length > 0 ? skillItems : ["Software Engineering"],
-          },
-        ],
-        experience: experiences
-          .filter((e) => e.company.trim() || e.role.trim())
-          .map((e) => ({
-            company: e.company.trim() || "Organization",
-            role: e.role.trim() || "Role",
-            duration: e.duration.trim() || "",
-            location: e.location.trim() || "",
-            bullets: e.bullets.filter((b) => b.trim().length > 0),
-          })),
-        projects: projects
-          .filter((p) => p.name.trim())
-          .map((p) => ({
-            name: p.name.trim(),
-            description: p.description.trim(),
-            technologies: p.technologies
-              .split(",")
-              .map((t) => t.trim())
-              .filter(Boolean),
-            link: p.link.trim(),
-          })),
-        education: education
-          .filter((e) => e.institution.trim() || e.degree.trim())
-          .map((e) => ({
-            institution: e.institution.trim(),
-            degree: e.degree.trim(),
-            year: e.year.trim(),
-            details: e.details.trim(),
-          })),
+        summary,
+        skills_text: skillsStr,
+        experience: experiences,
+        projects: projects.map(({ technologies, ...project }) => ({
+          ...project,
+          technologies_text: technologies,
+        })),
+        education,
       };
 
       await ingestProfile(payload);

@@ -50,6 +50,7 @@ PLACEHOLDER_MARKERS = (
 )
 
 HF_LOGIN_COMMAND = r".\.venv-train\Scripts\hf.exe auth login"
+MIN_QLORA_VRAM_GIB = 8.0
 
 
 class DatasetValidationError(ValueError):
@@ -250,6 +251,13 @@ def train(config: TrainingConfig) -> None:
             "dataset validation can run anywhere with --validate-only."
         )
 
+    vram_gib = torch.cuda.get_device_properties(0).total_memory / (1024 ** 3)
+    if vram_gib < MIN_QLORA_VRAM_GIB:
+        raise RuntimeError(
+            f"The selected 8B QLoRA workflow requires at least {MIN_QLORA_VRAM_GIB:.0f} GiB "
+            f"of VRAM; detected {vram_gib:.1f} GiB. Use the Colab T4 workflow instead."
+        )
+
     model_accessible, access_detail = check_huggingface_model_access(config.base_model)
     if not model_accessible:
         raise RuntimeError(access_detail)
@@ -317,6 +325,18 @@ def train(config: TrainingConfig) -> None:
         peft_config=lora_config,
         processing_class=tokenizer,
     )
+
+    # AMP cannot safely scale FP16/BF16 trainable adapter gradients. Keep the
+    # frozen quantized base in low precision, but promote LoRA weights to FP32.
+    for parameter in trainer.model.parameters():
+        if parameter.requires_grad and parameter.dtype != torch.float32:
+            parameter.data = parameter.data.to(torch.float32)
+    trainable_dtypes = {
+        parameter.dtype for parameter in trainer.model.parameters() if parameter.requires_grad
+    }
+    if trainable_dtypes != {torch.float32}:
+        raise RuntimeError(f"Unsafe trainable adapter parameter dtypes: {trainable_dtypes}")
+
     trainer.train()
 
     output_dir = Path(config.output)

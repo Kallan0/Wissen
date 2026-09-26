@@ -3,14 +3,57 @@
 @tailwind utilities;
 
 :root {
-  --background: #fff8f4;
-  --foreground: #221a12;
+  color-scheme: light;
+  --paper: 255 248 244;
+  --paper-sheet: 255 253 249;
+  --manila: 252 235 221;
+  --manila-high: 246 229 215;
+  --manila-low: 255 241 230;
+  --ink: 34 26 18;
+  --ink-muted: 88 65 60;
+  --ink-outline: 140 113 107;
+  --ink-light: 224 191 185;
+  --terracotta: 200 75 49;
+  --terracotta-dark: 166 51 27;
+  --fountain-teal: 40 104 100;
+  --teal-light: 175 238 233;
+  --vintage-gold: 217 155 38;
+  --vintage-gold-dark: 124 84 0;
+  --gold-light: 255 222 174;
+  --shadow-ink: 34 26 18;
+  --background: rgb(var(--paper));
+  --foreground: rgb(var(--ink));
+  --dot-color: rgb(var(--ink-outline));
+}
+
+.dark {
+  color-scheme: dark;
+  --paper: 22 17 14;
+  --paper-sheet: 31 24 20;
+  --manila: 43 33 27;
+  --manila-high: 55 42 34;
+  --manila-low: 35 27 23;
+  --ink: 246 232 218;
+  --ink-muted: 198 169 154;
+  --ink-outline: 126 98 86;
+  --ink-light: 82 61 52;
+  --terracotta: 237 112 82;
+  --terracotta-dark: 197 78 54;
+  --fountain-teal: 102 184 176;
+  --teal-light: 29 68 65;
+  --vintage-gold: 226 174 76;
+  --vintage-gold-dark: 242 195 102;
+  --gold-light: 82 61 35;
+  --shadow-ink: 6 4 3;
+  --background: rgb(var(--paper));
+  --foreground: rgb(var(--ink));
+  --dot-color: rgb(var(--ink-outline) / 0.55);
 }
 
 body {
   color: var(--foreground);
   background-color: var(--background);
-  background-image: radial-gradient(#8c716b 0.75px, transparent 0.75px);
+  background-image: radial-gradient(var(--dot-color) 0.75px, transparent 0.75px);
   background-size: 24px 24px;
   font-feature-settings: "rlig" 1, "calt" 1;
 }
@@ -19,14 +62,14 @@ body {
 .air-mail-ribbon {
   background: repeating-linear-gradient(
     45deg,
-    #a6331b,
-    #a6331b 8px,
-    #fff8f4 8px,
-    #fff8f4 16px,
-    #286864 16px,
-    #286864 24px,
-    #fff8f4 24px,
-    #fff8f4 32px
+    rgb(var(--terracotta-dark)),
+    rgb(var(--terracotta-dark)) 8px,
+    rgb(var(--paper)) 8px,
+    rgb(var(--paper)) 16px,
+    rgb(var(--fountain-teal)) 16px,
+    rgb(var(--fountain-teal)) 24px,
+    rgb(var(--paper)) 24px,
+    rgb(var(--paper)) 32px
   );
 }
 
@@ -36,13 +79,29 @@ body {
   height: 7px;
 }
 ::-webkit-scrollbar-track {
-  background: #fcebdd;
-  border-left: 1px solid #8c716b;
+  background: rgb(var(--manila));
+  border-left: 1px solid rgb(var(--ink-outline));
 }
 ::-webkit-scrollbar-thumb {
-  background: #8c716b;
-  border: 1px solid #221a12;
+  background: rgb(var(--ink-outline));
+  border: 1px solid rgb(var(--ink));
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #58413c;
+  background: rgb(var(--ink-muted));
+}
+
+/* Older components still using exact light-paper utilities inherit the theme. */
+.dark .bg-\[\#fffdf9\] { background-color: rgb(var(--paper-sheet)); }
+.dark .bg-\[\#fff8f4\] { background-color: rgb(var(--paper)); }
+.dark .bg-\[\#fff0ed\] { background-color: rgb(var(--terracotta) / 0.12); }
+.dark .bg-\[\#eefaf4\] { background-color: rgb(var(--fountain-teal) / 0.14); }
+.dark .hover\:bg-\[\#ebd9c1\]:hover { background-color: rgb(var(--manila-high)); }
+.dark .text-red-800 { color: rgb(254 202 202); }
+.dark .bg-red-50 { background-color: rgb(69 10 10 / 0.72); }
+.dark .text-emerald-800 { color: rgb(167 243 208); }
+.dark .border-emerald-300 { border-color: rgb(16 185 129 / 0.55); }
+
+html,
+body {
+  transition: background-color 180ms ease, color 180ms ease;
 }

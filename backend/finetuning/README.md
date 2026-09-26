@@ -49,16 +49,21 @@ python backend/finetuning/finetune_llama3.py \
 
 ### Step 3: Run Training
 
-#### Option A: Free Google Colab (Recommended for everyone)
+#### Option A: Google Colab T4 (required for the current 6 GB workstation)
 1. Open [Google Colab](https://colab.research.google.com/).
 2. Click **Upload** and select `backend/finetuning/fine_tune_colab.ipynb`.
 3. Set Runtime to **T4 GPU** (`Runtime -> Change runtime type -> T4 GPU`).
-4. Run the notebook cells:
-   - When prompted, upload `training_data.jsonl`.
-   - The notebook will train using Unsloth in ~15 minutes.
-   - It will automatically convert the weights to GGUF format (`resume_tailor_q4.gguf`) and download it to your computer.
+4. Run the notebook cells in order:
+   - authorize Drive for resumable checkpoints;
+   - authenticate to Hugging Face with a read-only token;
+   - upload only the approved `training_data.jsonl` when prompted;
+   - download the resulting `resume-llama3-lora-adapter.zip`.
 
-#### Option B: Local Training (Requires NVIDIA GPU with >= 8GB VRAM)
+The notebook verifies the exact approved dataset SHA-256, refuses the holdout file, records package/model metadata, and exports only the adapter. It intentionally does not merge or create GGUF before holdout evaluation.
+
+If a previous notebook copy fails with `_amp_foreach_non_finite_check_and_unscale_cuda` for `BFloat16`, upload the current notebook again and restart the Colab runtime. The current workflow detects GPU precision support and promotes all trainable LoRA parameters to FP32 before AMP training.
+
+#### Option B: Local Training (Requires an NVIDIA GPU with at least 8 GB VRAM)
 ```bash
 pip install -r backend/finetuning/requirements.txt
 python backend/finetuning/finetune_llama3.py \
@@ -67,7 +72,23 @@ python backend/finetuning/finetune_llama3.py \
   --epochs 3
 ```
 
-### Step 4: Evaluate, merge, convert, and import into Ollama
+### Step 4: Evaluate the adapter on the untouched holdout
+
+1. Open Colab and upload `backend/finetuning/evaluate_adapter_colab.ipynb`.
+2. Select a T4 GPU and run the cells in order.
+3. Upload these two files when prompted:
+   - `backend/finetuning/artifacts/resume-llama3-lora-adapter.zip`
+   - `backend/data/finetuning/holdout_eval.jsonl`
+4. Download `adapter_holdout_outputs.json` after all 30 records finish.
+5. Copy it to `backend/finetuning/artifacts/adapter_holdout_outputs.json` and run:
+
+```powershell
+backend\venv\Scripts\python.exe backend\finetuning\score_adapter_outputs.py
+```
+
+The notebook pins the adapter, holdout, training-data, and base-revision hashes; passes only system/user turns into the model; and saves resumable progress to Google Drive after every record. The local scorer validates all record IDs, factual/static rules, exact training-output leakage, and improvement over the recorded baseline. A passing automated report still requires manual review of the generated comparison packet.
+
+### Step 5: Merge, convert, and import into Ollama
 
 The adapter must first pass the holdout gates in `IMPLEMENTATION.md`. Merge it with the exact training base, then import supported merged Safetensors or convert/quantize it to GGUF. The legacy `export_ollama.py` registers an existing GGUF; it does not perform GGUF conversion itself.
 
@@ -80,5 +101,5 @@ Or manually:
 ollama create resume-tailor -f backend/finetuning/Modelfile.exported
 ```
 
-### Step 5: Use in App
+### Step 6: Use in App
 Select **`resume-tailor`** in the model selector on the **Tailor Resume** tab after the exported model passes the same holdout evaluation.

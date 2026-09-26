@@ -13,6 +13,7 @@ import {
   X,
 } from "lucide-react";
 import { HealthResponse } from "@/lib/types";
+import ThemeToggle from "@/components/ThemeToggle";
 
 interface NavbarProps {
   health: HealthResponse | null;
@@ -48,7 +49,7 @@ export default function Navbar({
         Matches Google Stitch layout.
         Includes MCP logo, name "Wissen", and responsive mobile navigation drawer toggle.
       */}
-      <header className="fixed top-0 left-0 right-0 lg:right-72 z-40 bg-[#fff8f4]/95 backdrop-blur-md border-b-2 border-ink shadow-[0_2px_0px_#221a12] h-16">
+      <header className="fixed top-0 left-0 right-0 lg:right-72 z-40 bg-paper/95 backdrop-blur-md border-b-2 border-ink shadow-[0_2px_0px_rgb(var(--shadow-ink))] h-16">
         <div className="h-full px-5 sm:px-8 flex items-center justify-between">
           {/* Logo + Name */}
           <div className="flex items-center gap-3">
@@ -62,16 +63,19 @@ export default function Navbar({
             </span>
           </div>
 
-          {/* Mobile Menu Toggle Button */}
-          <button
-            type="button"
-            onClick={() => setMobileOpen(!mobileOpen)}
-            className="lg:hidden flex items-center gap-1.5 px-3 py-1.5 rounded border-2 border-ink bg-manila font-mono text-xs font-bold text-ink shadow-press hover:bg-terracotta hover:text-paper transition-all"
-            aria-label="Toggle Navigation Menu"
-          >
-            {mobileOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
-            <span className="uppercase text-[11px]">{mobileOpen ? "Close" : "Menu"}</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+            {/* Mobile Menu Toggle Button */}
+            <button
+              type="button"
+              onClick={() => setMobileOpen(!mobileOpen)}
+              className="lg:hidden flex items-center gap-1.5 px-3 py-1.5 rounded border-2 border-ink bg-manila font-mono text-xs font-bold text-ink shadow-press hover:bg-terracotta hover:text-paper transition-all"
+              aria-label="Toggle Navigation Menu"
+            >
+              {mobileOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
+              <span className="uppercase text-[11px]">{mobileOpen ? "Close" : "Menu"}</span>
+            </button>
+          </div>
         </div>
       </header>
 
@@ -88,7 +92,7 @@ export default function Navbar({
         Fixed vertical aside matching the Stitch screen layout exactly.
       */}
       <aside
-        className={`fixed right-0 top-0 bottom-0 w-72 bg-manila border-l-2 border-ink shadow-[-3px_0_0px_#221a12] z-50 flex flex-col justify-between transition-transform duration-200 ease-in-out ${
+        className={`fixed right-0 top-0 bottom-0 w-72 bg-manila border-l-2 border-ink shadow-[-3px_0_0px_rgb(var(--shadow-ink))] z-50 flex flex-col justify-between transition-transform duration-200 ease-in-out ${
           mobileOpen ? "translate-x-0" : "translate-x-full lg:translate-x-0"
         }`}
       >

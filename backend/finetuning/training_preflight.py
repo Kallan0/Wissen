@@ -20,6 +20,7 @@ if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
 from finetuning.finetune_llama3 import (  # noqa: E402
+    MIN_QLORA_VRAM_GIB,
     check_huggingface_model_access,
     load_validated_records,
 )
@@ -44,6 +45,7 @@ def run_preflight(
     holdout: Path,
     output: Path,
     min_free_gb: float = 30.0,
+    min_vram_gb: float = MIN_QLORA_VRAM_GIB,
     base_model: str | None = None,
 ) -> dict[str, Any]:
     checks: list[Check] = []
@@ -71,17 +73,28 @@ def run_preflight(
 
     cuda_detail = "torch unavailable"
     cuda_ok = False
+    detected_vram_gb = 0.0
     try:
         torch = importlib.import_module("torch")
         cuda_ok = bool(torch.cuda.is_available())
         if cuda_ok:
             properties = torch.cuda.get_device_properties(0)
-            cuda_detail = f"{properties.name}; {properties.total_memory / (1024 ** 3):.1f} GiB VRAM"
+            detected_vram_gb = properties.total_memory / (1024 ** 3)
+            cuda_detail = f"{properties.name}; {detected_vram_gb:.1f} GiB VRAM"
         else:
             cuda_detail = "CUDA is not available"
     except Exception as exc:
         cuda_detail = str(exc)
     checks.append(Check("cuda", "pass" if cuda_ok else "fail", cuda_detail))
+    if cuda_ok:
+        vram_ok = detected_vram_gb >= min_vram_gb
+        checks.append(
+            Check(
+                "vram",
+                "pass" if vram_ok else "fail",
+                f"{detected_vram_gb:.1f} GiB available; {min_vram_gb:.1f} GiB required",
+            )
+        )
 
     if base_model:
         model_ok, model_detail = check_huggingface_model_access(base_model)
@@ -114,6 +127,7 @@ def main() -> int:
     parser.add_argument("--output", default="backend/finetuning/artifacts/resume-llama3-lora")
     parser.add_argument("--report", default="backend/data/finetuning/reports/training_preflight.json")
     parser.add_argument("--min-free-gb", type=float, default=30.0)
+    parser.add_argument("--min-vram-gb", type=float, default=MIN_QLORA_VRAM_GIB)
     parser.add_argument("--base-model", default="meta-llama/Meta-Llama-3-8B-Instruct")
     parser.add_argument(
         "--skip-model-access-check",
@@ -126,6 +140,7 @@ def main() -> int:
         Path(args.holdout),
         Path(args.output),
         args.min_free_gb,
+        args.min_vram_gb,
         None if args.skip_model_access_check else args.base_model,
     )
     report_path = Path(args.report)
