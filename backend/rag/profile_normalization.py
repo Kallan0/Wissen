@@ -1,5 +1,7 @@
 from typing import Any, Dict, List
 
+from content_quality import content_key, unique_texts
+
 
 def _text(value: Any) -> str:
     return value.strip() if isinstance(value, str) else ""
@@ -12,10 +14,12 @@ def _string_list(value: Any) -> List[str]:
         candidates = value
     else:
         candidates = []
-    return [item.strip() for item in candidates if isinstance(item, str) and item.strip()]
+    return unique_texts(candidates, near_duplicate_threshold=1.0)
 
 
-def normalize_profile_submission(payload: Dict[str, Any]) -> Dict[str, Any]:
+def normalize_profile_submission(
+    payload: Dict[str, Any], *, require_identity: bool = True
+) -> Dict[str, Any]:
     """Validate a raw questionnaire payload and produce the ingestion schema.
 
     No identity, role, organization, or skill fallback is allowed at this
@@ -23,7 +27,7 @@ def normalize_profile_submission(payload: Dict[str, Any]) -> Dict[str, Any]:
     are rejected so placeholder text cannot enter the knowledge base.
     """
     name = _text(payload.get("name"))
-    if not name:
+    if require_identity and not name:
         raise ValueError("Full name is required.")
 
     contact_input = payload.get("contact") if isinstance(payload.get("contact"), dict) else {}
@@ -43,7 +47,7 @@ def normalize_profile_submission(payload: Dict[str, Any]) -> Dict[str, Any]:
         skill_items = _string_list(skills_input)
         skills = [{"category": "Core Technical Competencies", "items": skill_items}] if skill_items else []
 
-    experiences = []
+    experiences_by_key: Dict[str, Dict[str, Any]] = {}
     for item in payload.get("experience", []) if isinstance(payload.get("experience"), list) else []:
         if not isinstance(item, dict):
             continue
@@ -53,16 +57,24 @@ def normalize_profile_submission(payload: Dict[str, Any]) -> Dict[str, Any]:
             continue
         if not company or not role:
             raise ValueError("Each experience must include both company and role.")
-        experiences.append({
+        normalized = {
             "company": company,
             "role": role,
             "duration": _text(item.get("duration")),
             "location": _text(item.get("location")),
             "bullets": _string_list(item.get("bullets")),
             "technologies": _string_list(item.get("technologies")),
-        })
+        }
+        key = "|".join((content_key(company), content_key(role), content_key(normalized["duration"])))
+        if key in experiences_by_key:
+            existing = experiences_by_key[key]
+            existing["bullets"] = unique_texts(existing["bullets"] + normalized["bullets"])
+            existing["technologies"] = unique_texts(existing["technologies"] + normalized["technologies"], near_duplicate_threshold=1.0)
+        else:
+            experiences_by_key[key] = normalized
+    experiences = list(experiences_by_key.values())
 
-    projects = []
+    projects_by_key: Dict[str, Dict[str, Any]] = {}
     for item in payload.get("projects", []) if isinstance(payload.get("projects"), list) else []:
         if not isinstance(item, dict):
             continue
@@ -74,13 +86,25 @@ def normalize_profile_submission(payload: Dict[str, Any]) -> Dict[str, Any]:
             continue
         if not name_value:
             raise ValueError("Each project must include a name.")
-        projects.append({
+        normalized = {
             "name": name_value,
             "description": _text(item.get("description")),
             "technologies": technologies,
             "highlights": highlights,
             "link": _text(item.get("link")),
-        })
+        }
+        key = content_key(name_value)
+        if key in projects_by_key:
+            existing = projects_by_key[key]
+            existing["highlights"] = unique_texts(existing["highlights"] + normalized["highlights"])
+            existing["technologies"] = unique_texts(existing["technologies"] + normalized["technologies"], near_duplicate_threshold=1.0)
+            if not existing["description"]:
+                existing["description"] = normalized["description"]
+            if not existing["link"]:
+                existing["link"] = normalized["link"]
+        else:
+            projects_by_key[key] = normalized
+    projects = list(projects_by_key.values())
 
     education = []
     for item in payload.get("education", []) if isinstance(payload.get("education"), list) else []:
@@ -99,7 +123,7 @@ def normalize_profile_submission(payload: Dict[str, Any]) -> Dict[str, Any]:
             "details": _text(item.get("details")),
         })
 
-    return {
+    normalized = {
         "name": name,
         "title": _text(payload.get("title")),
         "contact": contact,
@@ -109,3 +133,20 @@ def normalize_profile_submission(payload: Dict[str, Any]) -> Dict[str, Any]:
         "projects": projects,
         "education": education,
     }
+
+    has_meaningful_content = any((
+        normalized["name"],
+        any(contact.values()),
+        normalized["summary"],
+        normalized["skills"],
+        normalized["experience"],
+        normalized["projects"],
+        normalized["education"],
+    ))
+    if not has_meaningful_content:
+        raise ValueError(
+            "Add at least one experience, project, education record, skill, "
+            "summary, or identity field."
+        )
+
+    return normalized

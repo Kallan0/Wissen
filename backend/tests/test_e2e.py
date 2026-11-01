@@ -43,6 +43,14 @@ os.environ["CHROMA_DIR"] = str(TEST_CHROMA_DIR)
 # ── Import the FastAPI app (this initialises ChromaDB in-memory via config) ──
 from main import app  # noqa: E402
 from config import settings  # noqa: E402
+from rag.vectorstore import vector_store  # noqa: E402
+
+# Config may already be imported by another test module before this file sets
+# CHROMA_DIR. Force the lazy manager onto the isolated test directory and fail
+# loudly if a future test initializes it before isolation is applied.
+if vector_store.is_initialized:
+    raise RuntimeError("E2E ChromaDB was initialized before test isolation.")
+settings.CHROMA_DIR = TEST_CHROMA_DIR
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Fixtures
@@ -105,6 +113,7 @@ SAMPLE_JD = (
 )
 
 MINIMAL_PROFILE = {
+    "name": "Jane Candidate",
     "summary": "A passionate software engineer with backend expertise.",
     "experience": [
         {
@@ -143,12 +152,13 @@ MINIMAL_PROFILE = {
 
 # Mocked resume dict returned by the PDF generator
 MOCK_RESUME_DATA = {
-    "name": "Jane Doe",
-    "email": "jane@example.com",
-    "location": "Remote",
-    "target_role": "Backend Engineer",
-    "summary": "Experienced backend engineer.",
-    "experience": [],
+    "basics": {
+        "name": "Jane Doe",
+        "email": "jane@example.com",
+        "label": "Backend Engineer",
+        "summary": "Experienced backend engineer.",
+    },
+    "work": [],
     "projects": [],
     "skills": [],
     "education": [],
@@ -161,10 +171,12 @@ def _mock_ollama_status():
 
 def _mock_tailored_resume():
     return {
-        "name": "Jane Doe",
-        "target_role": "Backend Engineer",
-        "summary": "Tailored resume summary.",
-        "experience": [],
+        "basics": {
+            "name": "Jane Doe",
+            "label": "Backend Engineer",
+            "summary": "Tailored resume summary.",
+        },
+        "work": [],
         "projects": [],
         "skills": [],
         "education": [],
@@ -174,8 +186,8 @@ def _mock_tailored_resume():
 def _mock_recommendations():
     return {
         "positions": [
-            {"title": "Senior Backend Engineer", "match_score": 0.92},
-            {"title": "Platform Engineer", "match_score": 0.85},
+            {"title": "Backend Engineering Intern", "match_score": 0.92},
+            {"title": "Junior Platform Engineer", "match_score": 0.85},
         ]
     }
 
@@ -195,6 +207,7 @@ class TestHealthAndModels:
         assert resp.status_code == 200
         body = resp.json()
         assert body["status"] == "healthy"
+        assert body["api_revision"] == "logical-chunks-query-expansion-v1"
         assert "ollama" in body
         assert "knowledge_base" in body
 
@@ -316,10 +329,27 @@ class TestIngestProfile:
         assert stats["skills"] > 0
         assert stats["education"] > 0
 
-    def test_ingest_profile_empty_body_still_succeeds(self, client):
-        """An empty profile is valid – it just indexes nothing."""
-        resp = client.post("/api/knowledge-base/ingest-profile", json={})
+    @pytest.mark.parametrize(
+        "payload,collection",
+        [
+            ({"experience": [{"company": "Acme", "role": "Intern"}]}, "experiences"),
+            ({"projects": [{"name": "New Project", "description": "Verified work"}]}, "projects"),
+            ({"education": [{"institution": "Example University", "degree": "BCA"}]}, "education"),
+        ],
+    )
+    def test_existing_profile_accepts_section_without_identity(self, client, payload, collection):
+        client.post("/api/knowledge-base/ingest-profile", json=MINIMAL_PROFILE)
+        before = client.get("/api/knowledge-base/stats").json()[collection]
+
+        resp = client.post("/api/knowledge-base/ingest-profile", json=payload)
+
         assert resp.status_code == 200
+        assert resp.json()["stats"][collection] > before
+
+    def test_ingest_profile_empty_body_is_rejected(self, client):
+        """Identity guards must prevent anonymous profile records."""
+        resp = client.post("/api/knowledge-base/ingest-profile", json={})
+        assert resp.status_code == 400
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -510,7 +540,6 @@ class TestTailorResume:
                     "candidate_name": "Jane Doe",
                     "candidate_email": "jane@example.com",
                     "candidate_location": "Remote",
-                    "template": "modern",
                 },
             )
         assert resp.status_code == 200
@@ -521,6 +550,10 @@ class TestTailorResume:
             "ai.generator.resume_generator.generate_tailored_resume",
             new_callable=AsyncMock,
             return_value=_mock_tailored_resume(),
+        ), patch(
+            "ai.generator.resume_generator.expand_job_query",
+            new_callable=AsyncMock,
+            return_value=["React", "Next.js", "responsive design"],
         ):
             resp = client.post("/api/tailor", json={"job_description": SAMPLE_JD})
         rag = resp.json()["rag_context"]
@@ -528,6 +561,7 @@ class TestTailorResume:
         assert "retrieved_items" in rag
         assert "keywords" in rag
         assert isinstance(rag["keywords"], list)
+        assert rag["expanded_concepts"] == ["React", "Next.js", "responsive design"]
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -727,64 +761,11 @@ class TestFilesystemConnector:
 # 14 ── PDF Export & Download
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestPDFExport:
-    def _fake_pdf_path(self, tmp_path: Path) -> Path:
-        pdf_file = tmp_path / "generated_resume_abc123.pdf"
-        pdf_file.write_bytes(b"%PDF-1.4 fake content %%EOF")
-        return pdf_file
-
-    def test_export_pdf_success(self, client, tmp_path):
-        fake_path = self._fake_pdf_path(tmp_path)
-
-        with patch(
-            "pdf.generator.pdf_generator.generate_pdf",
-            new_callable=AsyncMock,
-            return_value=fake_path,
-        ):
-            resp = client.post(
-                "/api/export-pdf",
-                json={"resume_data": MOCK_RESUME_DATA, "template": "modern"},
-            )
-        assert resp.status_code == 200
-        body = resp.json()
-        assert body["status"] == "success"
-        assert "filename" in body
-        assert "download_url" in body
-        assert body["download_url"].startswith("/api/download-pdf/")
-
-    def test_export_pdf_missing_resume_data_returns_422(self, client):
-        resp = client.post("/api/export-pdf", json={"template": "modern"})
-        assert resp.status_code == 422
-
-    def test_export_pdf_error_handled(self, client):
-        with patch(
-            "pdf.generator.pdf_generator.generate_pdf",
-            new_callable=AsyncMock,
-            side_effect=Exception("Playwright crash"),
-        ):
-            resp = client.post(
-                "/api/export-pdf",
-                json={"resume_data": MOCK_RESUME_DATA},
-            )
-        assert resp.status_code == 500
-        assert "PDF generation failed" in resp.json()["detail"]
-
-    def test_download_pdf_not_found_returns_404(self, client):
-        resp = client.get("/api/download-pdf/nonexistent_file.pdf")
-        assert resp.status_code == 404
-
-    def test_download_pdf_found(self, client, tmp_path):
-        """
-        Patch the PDF_DIR setting so the route resolves our temp file.
-        """
-        fake_pdf = tmp_path / "my_resume.pdf"
-        fake_pdf.write_bytes(b"%PDF-1.4 minimal %%EOF")
-
-        with patch("main.settings") as mock_settings:
-            mock_settings.PDF_DIR = tmp_path
-            resp = client.get("/api/download-pdf/my_resume.pdf")
-        assert resp.status_code == 200
-        assert resp.headers["content-type"] == "application/pdf"
+class TestBackendPDFRemoval:
+    def test_pdf_routes_are_not_owned_by_fastapi(self, client):
+        assert client.post("/api/export-pdf", json={"resume_data": MOCK_RESUME_DATA}).status_code == 404
+        assert client.post("/api/render-resume-html", json={"resume_data": MOCK_RESUME_DATA}).status_code == 404
+        assert client.get("/api/download-pdf/resume.pdf").status_code == 404
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -797,7 +778,7 @@ class TestFullE2EFlow:
       1. Seed the sample profile
       2. Ingest an extra text note
       3. Call /api/tailor with a real JD
-      4. Export a PDF from the tailored resume
+      4. Return JSON Resume for frontend review and Next.js PDF export
     """
 
     def test_full_flow(self, client, tmp_path):
@@ -821,9 +802,6 @@ class TestFullE2EFlow:
         assert note_resp.status_code == 200
 
         # Step 3 – Tailor resume
-        fake_path = tmp_path / "resume_final.pdf"
-        fake_path.write_bytes(b"%PDF-1.4 %%EOF")
-
         with patch(
             "ai.generator.resume_generator.generate_tailored_resume",
             new_callable=AsyncMock,
@@ -837,7 +815,6 @@ class TestFullE2EFlow:
                     "model": "llama3",
                     "candidate_name": "Joji Developer",
                     "candidate_email": "joji.dev@example.com",
-                    "template": "modern",
                 },
             )
         assert tailor_resp.status_code == 200
@@ -845,22 +822,11 @@ class TestFullE2EFlow:
         assert "resume" in tailor_body
         assert tailor_body["rag_context"]["match_count"] > 0
 
-        # Step 4 – Export PDF
-        with patch(
-            "pdf.generator.pdf_generator.generate_pdf",
-            new_callable=AsyncMock,
-            return_value=fake_path,
-        ):
-            export_resp = client.post(
-                "/api/export-pdf",
-                json={"resume_data": tailor_body["resume"], "template": "modern"},
-            )
-        assert export_resp.status_code == 200
-        export_body = export_resp.json()
+        # Step 4 - FastAPI stops at structured JSON; Next.js owns PDF export.
+        assert tailor_body["resume"]["basics"]["name"] == "Jane Doe"
         print("\n✅  Full E2E flow completed successfully.")
         print(f"   KB items: {seed_resp.json()['stats']['total_items']} (after seed)")
         print(f"   RAG matches: {tailor_body['rag_context']['match_count']}")
-        print(f"   PDF filename: {export_body['filename']}")
 
 
 def test_get_candidate_profile_and_grounded_fallback(client):
@@ -924,8 +890,8 @@ def test_get_candidate_profile_and_grounded_fallback(client):
     tailored_resume = tailor_resp.json()["resume"]
 
     # Verify real data is present and NO "Alex Morgan" or "TechNova" placeholder exists
-    assert tailored_resume["name"] == "Jane Candidate"
-    assert tailored_resume["contact"]["email"] == "jane.candidate@example.com"
-    assert tailored_resume["experience"][0]["company"] == "CloudScale Inc"
+    assert tailored_resume["basics"]["name"] == "Jane Candidate"
+    assert tailored_resume["basics"]["email"] == "jane.candidate@example.com"
+    assert tailored_resume["work"][0]["name"] == "CloudScale Inc"
     assert "Alex Morgan" not in str(tailored_resume)
     assert "TechNova" not in str(tailored_resume)

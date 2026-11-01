@@ -1,8 +1,10 @@
 "use client";
 
-import React, { useState } from "react";
-import { X, Plus, Trash2, CheckCircle2, UserCheck, Briefcase, GraduationCap, Code, Sparkles, FolderGit2 } from "lucide-react";
-import { ingestProfile } from "@/lib/api";
+import React, { useEffect, useState } from "react";
+import { X, Plus, Trash2, UserCheck, Briefcase, GraduationCap, Code, Sparkles, FolderGit2 } from "lucide-react";
+import { fetchKBStats, ingestProfile } from "@/lib/api";
+
+type EntryMode = "profile" | "experience" | "project" | "education";
 
 interface ProfileQuestionnaireModalProps {
   isOpen: boolean;
@@ -60,6 +62,32 @@ export default function ProfileQuestionnaireModal({
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [identityRequired, setIdentityRequired] = useState<boolean | null>(null);
+  const [entryMode, setEntryMode] = useState<EntryMode>("profile");
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    let cancelled = false;
+    setIdentityRequired(null);
+    fetchKBStats()
+      .then((stats) => {
+        if (cancelled) return;
+        const isEmpty = stats.total_items === 0;
+        setIdentityRequired(isEmpty);
+        setEntryMode(isEmpty ? "profile" : "experience");
+      })
+      .catch(() => {
+        if (cancelled) return;
+        // Be conservative if the knowledge-base status cannot be verified.
+        setIdentityRequired(true);
+        setEntryMode("profile");
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -98,9 +126,24 @@ export default function ProfileQuestionnaireModal({
     setExperiences(copy);
   };
 
+  const resetForm = () => {
+    setName("");
+    setTitle("");
+    setEmail("");
+    setPhone("");
+    setLocation("");
+    setLinkedin("");
+    setGithub("");
+    setSummary("");
+    setSkillsStr("");
+    setExperiences([{ company: "", role: "", duration: "", location: "", bullets: [""] }]);
+    setProjects([{ name: "", description: "", technologies: "", link: "" }]);
+    setEducation([{ institution: "", degree: "", year: "", details: "" }]);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) {
+    if (identityRequired && !name.trim()) {
       setError("Please enter your full name.");
       return;
     }
@@ -108,27 +151,29 @@ export default function ProfileQuestionnaireModal({
     setLoading(true);
 
     try {
-      const payload = {
-        name,
-        title,
-        contact: {
-          email,
-          phone,
-          location,
-          linkedin,
-          github,
-        },
-        summary,
-        skills_text: skillsStr,
-        experience: experiences,
-        projects: projects.map(({ technologies, ...project }) => ({
-          ...project,
-          technologies_text: technologies,
-        })),
-        education,
-      };
+      const projectPayload = projects.map(({ technologies, ...project }) => ({
+        ...project,
+        technologies_text: technologies,
+      }));
+      const payload: Record<string, any> = entryMode === "profile"
+        ? {
+            name,
+            title,
+            contact: { email, phone, location, linkedin, github },
+            summary,
+            skills_text: skillsStr,
+            experience: experiences,
+            projects: projectPayload,
+            education,
+          }
+        : entryMode === "experience"
+          ? { experience: experiences }
+          : entryMode === "project"
+            ? { projects: projectPayload }
+            : { education };
 
       await ingestProfile(payload);
+      resetForm();
       onSuccess();
       onClose();
     } catch (err: any) {
@@ -174,18 +219,60 @@ export default function ProfileQuestionnaireModal({
             </div>
           )}
 
+          {identityRequired === null ? (
+            <div className="p-3 bg-manila/50 border border-ink/30 rounded font-mono text-xs text-ink-muted">
+              Checking whether this is a new or existing profile...
+            </div>
+          ) : !identityRequired ? (
+            <div className="space-y-2">
+              <div className="font-mono text-[10px] uppercase font-bold text-ink-muted">
+                What would you like to add?
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {([
+                  ["experience", "Experience"],
+                  ["project", "Project"],
+                  ["education", "Education"],
+                  ["profile", "Profile details"],
+                ] as [EntryMode, string][]).map(([mode, label]) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    onClick={() => setEntryMode(mode)}
+                    className={`p-2 border-2 rounded font-mono text-[11px] font-bold uppercase transition-colors ${
+                      entryMode === mode
+                        ? "bg-ink text-paper border-ink"
+                        : "bg-paper text-ink border-ink/30 hover:border-ink"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <p className="font-serif text-xs italic text-ink-muted">
+                Your saved identity will be reused. Only the selected section is submitted.
+              </p>
+            </div>
+          ) : (
+            <div className="p-3 bg-manila/50 border border-ink/30 rounded font-serif text-xs text-ink-muted">
+              The knowledge base is empty. Create the profile identity first; future entries can be added individually.
+            </div>
+          )}
+
           {/* Personal Info */}
-          <div className="space-y-3">
+          {entryMode === "profile" && <div className="space-y-3">
             <h3 className="font-mono text-xs font-bold uppercase tracking-wider text-ink flex items-center gap-1.5 border-b border-ink/20 pb-1">
               <UserCheck className="w-4 h-4 text-terracotta" />
               1. Candidate Contact & Profile Header
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
-                <label className="font-mono text-[10px] uppercase text-ink-muted block mb-1">Full Name *</label>
+                <label className="font-mono text-[10px] uppercase text-ink-muted block mb-1">
+                  Full Name {identityRequired ? "*" : ""}
+                </label>
                 <input
                   type="text"
-                  required
+                  required={identityRequired === true}
                   placeholder="e.g. Jane Doe"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
@@ -196,7 +283,7 @@ export default function ProfileQuestionnaireModal({
                 <label className="font-mono text-[10px] uppercase text-ink-muted block mb-1">Target Title</label>
                 <input
                   type="text"
-                  placeholder="e.g. Senior Full-Stack Engineer"
+                  placeholder="e.g. Software Engineering Intern"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   className="w-full font-mono text-xs p-2 border-2 border-ink/40 rounded focus:border-ink bg-paper"
@@ -242,11 +329,21 @@ export default function ProfileQuestionnaireModal({
                   className="w-full font-mono text-xs p-2 border-2 border-ink/40 rounded focus:border-ink bg-paper"
                 />
               </div>
+              <div>
+                <label className="font-mono text-[10px] uppercase text-ink-muted block mb-1">GitHub Profile</label>
+                <input
+                  type="text"
+                  placeholder="github.com/janedoe"
+                  value={github}
+                  onChange={(e) => setGithub(e.target.value)}
+                  className="w-full font-mono text-xs p-2 border-2 border-ink/40 rounded focus:border-ink bg-paper"
+                />
+              </div>
             </div>
-          </div>
+          </div>}
 
           {/* Executive Summary */}
-          <div>
+          {entryMode === "profile" && <div>
             <label className="font-mono text-xs font-bold uppercase tracking-wider text-ink block mb-1">
               2. Executive Summary / Bio Overview
             </label>
@@ -257,10 +354,10 @@ export default function ProfileQuestionnaireModal({
               onChange={(e) => setSummary(e.target.value)}
               className="w-full font-mono text-xs p-3 border-2 border-ink/40 rounded focus:border-ink bg-paper leading-relaxed"
             />
-          </div>
+          </div>}
 
           {/* Technical Skills */}
-          <div>
+          {entryMode === "profile" && <div>
             <label className="font-mono text-xs font-bold uppercase tracking-wider text-ink block mb-1 flex items-center gap-1.5">
               <Code className="w-3.5 h-3.5 text-fountain-teal" />
               3. Technical Skills (Comma Separated)
@@ -272,10 +369,10 @@ export default function ProfileQuestionnaireModal({
               onChange={(e) => setSkillsStr(e.target.value)}
               className="w-full font-mono text-xs p-2.5 border-2 border-ink/40 rounded focus:border-ink bg-paper"
             />
-          </div>
+          </div>}
 
           {/* Work Experience */}
-          <div className="space-y-4">
+          {(entryMode === "profile" || entryMode === "experience") && <div className="space-y-4">
             <div className="flex items-center justify-between border-b border-ink/20 pb-1">
               <h3 className="font-mono text-xs font-bold uppercase tracking-wider text-ink flex items-center gap-1.5">
                 <Briefcase className="w-4 h-4 text-terracotta" />
@@ -371,16 +468,85 @@ export default function ProfileQuestionnaireModal({
                 </div>
               </div>
             ))}
-          </div>
+          </div>}
+
+          {/* Projects */}
+          {(entryMode === "profile" || entryMode === "project") && <div className="space-y-3">
+            <div className="flex items-center justify-between border-b border-ink/20 pb-1">
+              <h3 className="font-mono text-xs font-bold uppercase tracking-wider text-ink flex items-center gap-1.5">
+                <FolderGit2 className="w-4 h-4 text-terracotta" />
+                Projects
+              </h3>
+              <button
+                type="button"
+                onClick={() => setProjects([...projects, { name: "", description: "", technologies: "", link: "" }])}
+                className="font-mono text-[11px] bg-manila hover:bg-manila/80 px-2.5 py-1 rounded border border-ink font-bold flex items-center gap-1"
+              >
+                <Plus className="w-3 h-3 text-terracotta" /> ADD PROJECT
+              </button>
+            </div>
+            {projects.map((project, idx) => (
+              <div key={idx} className="p-4 bg-manila/40 border-2 border-ink/40 rounded-lg space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="font-mono text-[10px] uppercase font-bold text-ink-muted">PROJECT #{idx + 1}</span>
+                  {projects.length > 1 && (
+                    <button type="button" onClick={() => setProjects(projects.filter((_, i) => i !== idx))} className="text-terracotta text-xs font-mono flex items-center gap-1">
+                      <Trash2 className="w-3.5 h-3.5" /> REMOVE
+                    </button>
+                  )}
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {([
+                    ["name", "Project Name"],
+                    ["technologies", "Technologies (comma separated)"],
+                    ["link", "Project Link"],
+                  ] as const).map(([field, placeholder]) => (
+                    <input
+                      key={field}
+                      type="text"
+                      placeholder={placeholder}
+                      value={project[field]}
+                      onChange={(e) => {
+                        const copy = [...projects];
+                        copy[idx] = { ...copy[idx], [field]: e.target.value };
+                        setProjects(copy);
+                      }}
+                      className="font-mono text-xs p-2 border-2 border-ink/30 rounded bg-paper"
+                    />
+                  ))}
+                </div>
+                <textarea
+                  rows={3}
+                  placeholder="Crisp description of what you built, your contribution, and the result..."
+                  value={project.description}
+                  onChange={(e) => {
+                    const copy = [...projects];
+                    copy[idx] = { ...copy[idx], description: e.target.value };
+                    setProjects(copy);
+                  }}
+                  className="w-full font-mono text-xs p-2 border-2 border-ink/30 rounded bg-paper"
+                />
+              </div>
+            ))}
+          </div>}
 
           {/* Education */}
-          <div className="space-y-3">
-            <h3 className="font-mono text-xs font-bold uppercase tracking-wider text-ink flex items-center gap-1.5 border-b border-ink/20 pb-1">
-              <GraduationCap className="w-4 h-4 text-fountain-teal" />
-              5. Education & Credentials
-            </h3>
+          {(entryMode === "profile" || entryMode === "education") && <div className="space-y-3">
+            <div className="flex items-center justify-between border-b border-ink/20 pb-1">
+              <h3 className="font-mono text-xs font-bold uppercase tracking-wider text-ink flex items-center gap-1.5">
+                <GraduationCap className="w-4 h-4 text-fountain-teal" />
+                Education & Credentials
+              </h3>
+              <button
+                type="button"
+                onClick={() => setEducation([...education, { institution: "", degree: "", year: "", details: "" }])}
+                className="font-mono text-[11px] bg-manila hover:bg-manila/80 px-2.5 py-1 rounded border border-ink font-bold flex items-center gap-1"
+              >
+                <Plus className="w-3 h-3 text-terracotta" /> ADD EDUCATION
+              </button>
+            </div>
             {education.map((edu, idx) => (
-              <div key={idx} className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3 bg-manila/30 border border-ink/30 rounded">
+              <div key={idx} className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3 bg-manila/30 border border-ink/30 rounded relative">
                 <input
                   type="text"
                   placeholder="Institution Name"
@@ -414,9 +580,25 @@ export default function ProfileQuestionnaireModal({
                   }}
                   className="font-mono text-xs p-2 border border-ink/30 rounded bg-paper"
                 />
+                <textarea
+                  rows={2}
+                  placeholder="Coursework, honors, or other verified details"
+                  value={edu.details}
+                  onChange={(e) => {
+                    const copy = [...education];
+                    copy[idx].details = e.target.value;
+                    setEducation(copy);
+                  }}
+                  className="sm:col-span-3 font-mono text-xs p-2 border border-ink/30 rounded bg-paper"
+                />
+                {education.length > 1 && (
+                  <button type="button" onClick={() => setEducation(education.filter((_, i) => i !== idx))} className="sm:col-span-3 justify-self-end text-terracotta text-xs font-mono flex items-center gap-1">
+                    <Trash2 className="w-3.5 h-3.5" /> REMOVE
+                  </button>
+                )}
               </div>
             ))}
-          </div>
+          </div>}
 
           {/* Submit Action */}
           <div className="pt-4 border-t-2 border-ink/20 flex justify-end gap-3 shrink-0">
@@ -429,7 +611,7 @@ export default function ProfileQuestionnaireModal({
             </button>
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || identityRequired === null}
               className="px-6 py-2.5 bg-terracotta hover:bg-[#b03d25] text-paper font-mono font-bold text-xs uppercase tracking-wider rounded border-2 border-ink shadow-press transition-all disabled:opacity-50 inline-flex items-center gap-2"
             >
               {loading ? (
@@ -440,7 +622,7 @@ export default function ProfileQuestionnaireModal({
               ) : (
                 <>
                   <Sparkles className="w-3.5 h-3.5 text-paper" />
-                  SAVE & INGEST TO KNOWLEDGE BASE
+                  {entryMode === "profile" ? "SAVE PROFILE TO KNOWLEDGE BASE" : `ADD ${entryMode.toUpperCase()}`}
                 </>
               )}
             </button>

@@ -1,27 +1,13 @@
 import os
-import sys
 import asyncio
 import logging
-from typing import Dict, Any, List, Literal, Optional
+import time
+from typing import Dict, Any, List, Optional
 from pathlib import Path
-
-# ── Windows asyncio fix ───────────────────────────────────────────────────────
-# The default SelectorEventLoop on Windows cannot spawn subprocesses, which
-# Playwright needs to launch Chromium.  ProactorEventLoop supports both I/O
-# and subprocess creation, making it the correct choice for Windows.
-if sys.platform == "win32" and sys.version_info < (3, 14):
-    set_policy = getattr(asyncio, "set_event_loop_policy", None)
-    proactor_policy = getattr(asyncio, "WindowsProactorEventLoopPolicy", None)
-    if set_policy and proactor_policy:
-        try:
-            set_policy(proactor_policy())
-        except Exception:
-            pass
-# ─────────────────────────────────────────────────────────────────────────────
 
 from fastapi import FastAPI, HTTPException, Body, Query, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from config import settings
@@ -30,7 +16,6 @@ from rag.ingestion import IngestionService
 from rag.profile_normalization import normalize_profile_submission
 from rag.retriever import rag_retriever
 from ai.generator import resume_generator
-from pdf.generator import pdf_generator
 from connectors import github_connector, canva_connector, creative_fs_connector
 from connectors.linkedin_connector import linkedin_connector
 from connectors.vault_connector import vault_connector
@@ -63,14 +48,13 @@ class IngestTextRequest(BaseModel):
 class TailorResumeRequest(BaseModel):
     job_description: str = Field(..., description="The target Job Description text")
     target_role: Optional[str] = Field("Software Engineer", description="Target job title")
-    model: Optional[str] = Field("llama3", description="Ollama model name")
+    model: Optional[str] = Field(None, description="Namespaced cloud model or local Ollama model")
     candidate_name: Optional[str] = None
     candidate_email: Optional[str] = None
     candidate_location: Optional[str] = None
-    template: Optional[str] = "modern"
 
 class RecommendPositionsRequest(BaseModel):
-    model: Optional[str] = Field("llama3", description="Ollama model name")
+    model: Optional[str] = Field(None, description="Namespaced cloud model or local Ollama model")
 
 class GitHubSyncRequest(BaseModel):
     username: str = Field(..., description="GitHub username")
@@ -91,10 +75,6 @@ class FilesystemScanRequest(BaseModel):
     directory_path: str = Field(..., description="Local folder path (e.g. Unity or Blender project)")
     custom_project_name: Optional[str] = Field(None, description="Optional custom name for the project")
 
-class ExportPDFRequest(BaseModel):
-    resume_data: Dict[str, Any] = Field(..., description="Structured resume JSON")
-    template: Literal["modern", "minimal", "vintage"] = "modern"
-
 class LinkedInSyncRequest(BaseModel):
     positions_csv: Optional[str] = Field(None, description="Raw Positions.csv content")
     skills_csv: Optional[str] = Field(None, description="Raw Skills.csv content")
@@ -106,86 +86,37 @@ class VaultScanRequest(BaseModel):
 class CoverLetterRequest(BaseModel):
     job_description: str = Field(..., description="Target Job Description text")
     target_role: Optional[str] = Field("Software Engineer", description="Target job title")
-    model: Optional[str] = Field("llama3", description="Ollama model name")
+    model: Optional[str] = Field(None, description="Namespaced cloud model or local Ollama model")
 
 class ATSAnalysisRequest(BaseModel):
     job_description: str = Field(..., description="Target Job Description text")
-    model: Optional[str] = Field("llama3", description="Ollama model name")
+    model: Optional[str] = Field(None, description="Namespaced cloud model or local Ollama model")
 
-
-def normalize_resume_data(data: Dict[str, Any]) -> Dict[str, Any]:
-    """Ensure all required fields exist with safe defaults before PDF rendering."""
-    contact = data.get("contact") or {}
-    if not isinstance(contact, dict):
-        contact = {}
-    return {
-        "name": data.get("name") or "Candidate",
-        "title": data.get("title") or data.get("target_role") or "Professional",
-        "contact": {
-            "email": contact.get("email") or "",
-            "phone": contact.get("phone") or "",
-            "location": contact.get("location") or "",
-            "linkedin": contact.get("linkedin") or "",
-            "github": contact.get("github") or "",
-            "portfolio": contact.get("portfolio") or "",
-        },
-        "summary": data.get("summary") or "",
-        "skills": [
-            {
-                "category": s.get("category", "Skills") if isinstance(s, dict) else "Skills",
-                "items": s.get("items", []) if isinstance(s, dict) else []
-            }
-            for s in (data.get("skills") or [])
-        ],
-        "experience": [
-            {
-                "company": e.get("company", "") if isinstance(e, dict) else "",
-                "role": e.get("role", "") if isinstance(e, dict) else "",
-                "duration": e.get("duration", "") if isinstance(e, dict) else "",
-                "location": e.get("location", "") if isinstance(e, dict) else "",
-                "bullets": e.get("bullets") or e.get("highlights") or [] if isinstance(e, dict) else [],
-                "technologies": e.get("technologies") or [] if isinstance(e, dict) else [],
-            }
-            for e in (data.get("experience") or [])
-        ],
-        "projects": [
-            {
-                "name": p.get("name", "") if isinstance(p, dict) else "",
-                "description": p.get("description", "") if isinstance(p, dict) else "",
-                "technologies": p.get("technologies") or [] if isinstance(p, dict) else [],
-                "bullets": p.get("bullets") or p.get("highlights") or [] if isinstance(p, dict) else [],
-                "highlights": p.get("highlights") or p.get("bullets") or [] if isinstance(p, dict) else [],
-                "link": p.get("link", "") if isinstance(p, dict) else "",
-            }
-            for p in (data.get("projects") or [])
-        ],
-        "education": [
-            {
-                "institution": e.get("institution", "") if isinstance(e, dict) else "",
-                "degree": e.get("degree", "") if isinstance(e, dict) else "",
-                "year": e.get("year", "") if isinstance(e, dict) else "",
-                "details": e.get("details", "") if isinstance(e, dict) else "",
-            }
-            for e in (data.get("education") or [])
-        ],
-    }
 
 # --- Health & Models Endpoints ---
+@app.get("/api/version")
+def api_version():
+    return {"api_revision": "logical-chunks-query-expansion-v1"}
+
+
 @app.get("/api/health")
 async def health_check():
-    ollama_info, db_stats = await asyncio.gather(
+    ollama_info, groq_info, db_stats = await asyncio.gather(
         resume_generator.check_ollama_status(),
+        resume_generator.check_groq_status(),
         asyncio.to_thread(vector_store.get_stats),
     )
     return {
         "status": "healthy",
+        "api_revision": "logical-chunks-query-expansion-v1",
         "ollama": ollama_info,
+        "groq": groq_info,
         "knowledge_base": db_stats
     }
 
 @app.get("/api/models")
 async def get_models():
-    models = await resume_generator.get_available_models()
+    models = await resume_generator.get_model_options()
     return {"models": models}
 
 # --- Knowledge Base Endpoints ---
@@ -232,9 +163,18 @@ async def upload_resume_pdf(file: UploadFile = File(...)):
 @app.post("/api/knowledge-base/ingest-profile")
 def ingest_profile_endpoint(payload: Dict[str, Any] = Body(...)):
     try:
-        normalized_profile = normalize_profile_submission(payload)
+        stats_before = vector_store.get_stats()
+        knowledge_base_is_empty = stats_before.get("total_items", 0) == 0
+        normalized_profile = normalize_profile_submission(
+            payload,
+            require_identity=knowledge_base_is_empty,
+        )
         counts = IngestionService.ingest_structured_profile(normalized_profile)
-        return {"message": "Profile successfully indexed into ChromaDB", "indexed": counts}
+        return {
+            "message": "Profile successfully indexed into ChromaDB",
+            "indexed": counts,
+            "stats": vector_store.get_stats(),
+        }
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error))
 
@@ -258,14 +198,17 @@ def clear_kb_endpoint():
     vector_store.clear_all()
     return {"message": "Knowledge base reset."}
 
-# --- RAG Retrieval & Tailoring Endpoints ---
+# --- RAG Retrieval & Tailoring Endpoints (LLM query expansion + hybrid search) ---
 @app.post("/api/tailor")
 async def tailor_resume(payload: TailorResumeRequest):
     if not payload.job_description.strip():
         raise HTTPException(status_code=400, detail="Job description cannot be empty.")
 
     # Check if Knowledge Base has any items
+    request_started = time.perf_counter()
+    profile_started = time.perf_counter()
     db_profile = await asyncio.to_thread(vector_store.get_candidate_profile)
+    profile_ms = round((time.perf_counter() - profile_started) * 1000)
     if not db_profile.get("exists"):
         raise HTTPException(
             status_code=400,
@@ -273,11 +216,22 @@ async def tailor_resume(payload: TailorResumeRequest):
         )
 
     try:
-        # 1. RAG Retrieval from ChromaDB
+        # 1. Expand broad JD concepts, then retrieve from ChromaDB.
+        target_role = payload.target_role or "Software Engineer"
+        expansion_started = time.perf_counter()
+        expanded_concepts = await resume_generator.expand_job_query(
+            job_description=payload.job_description,
+            target_role=target_role,
+            model=payload.model,
+        )
+        expansion_ms = round((time.perf_counter() - expansion_started) * 1000)
+        retrieval_started = time.perf_counter()
         retrieval_output = await asyncio.to_thread(
             rag_retriever.retrieve_context_for_jd,
             payload.job_description,
+            expanded_concepts,
         )
+        retrieval_ms = round((time.perf_counter() - retrieval_started) * 1000)
 
         # 2. Candidate basic info resolution (Explicit payload > ChromaDB stored identity)
         c_meta = db_profile.get("candidate", {})
@@ -291,12 +245,23 @@ async def tailor_resume(payload: TailorResumeRequest):
         }
 
         # 3. LLM Orchestration via Ollama (with resilient fallback)
+        generation_started = time.perf_counter()
         tailored_resume = await resume_generator.generate_tailored_resume(
             job_description=payload.job_description,
             retrieved_context=retrieval_output["formatted_context"],
-            target_role=payload.target_role or "Software Engineer",
+            target_role=target_role,
             candidate_info=cand_info,
             model=payload.model
+        )
+        generation_ms = round((time.perf_counter() - generation_started) * 1000)
+        total_ms = round((time.perf_counter() - request_started) * 1000)
+        logger.info(
+            "Tailor timing: profile=%dms expansion=%dms retrieval=%dms generation=%dms total=%dms",
+            profile_ms,
+            expansion_ms,
+            retrieval_ms,
+            generation_ms,
+            total_ms,
         )
 
         return {
@@ -304,7 +269,17 @@ async def tailor_resume(payload: TailorResumeRequest):
             "rag_context": {
                 "match_count": retrieval_output["match_count"],
                 "retrieved_items": retrieval_output["retrieved_items"],
-                "keywords": retrieval_output["extracted_keywords"]
+                "keywords": retrieval_output["extracted_keywords"],
+                "expanded_concepts": retrieval_output["expanded_concepts"],
+                "retrieval_strategy": retrieval_output["retrieval_strategy"],
+                "context_metrics": retrieval_output["context_metrics"],
+                "timing_ms": {
+                    "profile": profile_ms,
+                    "query_expansion": expansion_ms,
+                    "retrieval": retrieval_ms,
+                    "generation": generation_ms,
+                    "total": total_ms,
+                },
             }
         }
     except HTTPException:
@@ -442,51 +417,6 @@ async def analyze_ats_gap_endpoint(payload: ATSAnalysisRequest):
         logger.error(f"ATS gap analysis error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-# --- PDF Export Endpoints ---
-@app.post("/api/render-resume-html", response_class=HTMLResponse)
-async def render_resume_html(payload: ExportPDFRequest):
-    """Render the same backend-owned template used for PDF export."""
-    try:
-        clean_data = normalize_resume_data(payload.resume_data)
-        return HTMLResponse(
-            content=pdf_generator.render_html(
-                resume_data=clean_data,
-                template_name=payload.template or "modern",
-            )
-        )
-    except Exception as e:
-        logger.error(f"Error rendering resume preview: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Resume preview failed: {str(e)}")
-
-
-@app.post("/api/export-pdf")
-async def export_pdf(payload: ExportPDFRequest):
-    try:
-        clean_data = normalize_resume_data(payload.resume_data)
-        pdf_path = await pdf_generator.generate_pdf(
-            resume_data=clean_data,
-            template_name=payload.template or "modern"
-        )
-        return {
-            "status": "success",
-            "filename": pdf_path.name,
-            "download_url": f"/api/download-pdf/{pdf_path.name}"
-        }
-    except Exception as e:
-        logger.error(f"Error generating PDF: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"PDF generation failed: {str(e)}")
-
-@app.get("/api/download-pdf/{filename}")
-async def download_pdf(filename: str):
-    file_path = settings.PDF_DIR / filename
-    if not file_path.exists():
-        raise HTTPException(status_code=404, detail="Requested PDF file not found.")
-    return FileResponse(
-        path=str(file_path),
-        filename=filename,
-        media_type="application/pdf"
-    )
-
 # --- Fine-Tuning & Custom Models Endpoints ---
 class ExportDatasetRequest(BaseModel):
     count: int = Field(default=150, ge=100, le=200)
@@ -571,5 +501,10 @@ async def get_finetuning_status():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8001, reload=True)
+    uvicorn.run(
+        "main:app",
+        host="0.0.0.0",
+        port=int(os.getenv("BACKEND_PORT", "8002")),
+        reload=True,
+    )
 
