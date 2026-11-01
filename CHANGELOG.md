@@ -2,6 +2,78 @@
 
 All notable changes, architectural decisions, and version milestones for the **Local AI-Powered Resume Builder** are documented in this file. Detailed version logs can be found in the [`versions/`](file:///c:/Users/Joji/2026%20Exp/Resume_builder/versions/) directory.
 
+## [v1.29.0] - 2026-10-30
+
+### Summary
+
+Replaced resume character/window-style splitting with logical section chunks, added LLM-backed JD query expansion with deterministic fallback concepts, widened hybrid retrieval for fuzzy semantic matches, surfaced expansion terms in the UI, and instructed generation to include relevant verified peripheral skills. See [`versions/v1.29.0.md`](versions/v1.29.0.md).
+
+---
+
+## [v1.28.0] - 2026-10-30
+
+### Summary
+
+Fixed empty retrieval and blank resumes by moving MiniLM to a writable project cache, retaining BM25 results when dense search fails, correcting the Groq model identifier, and extracting verified identity and summary fields from raw resume documents. See [`versions/v1.28.0.md`](versions/v1.28.0.md).
+
+---
+
+## [v1.27.0] - 2026-10-30
+
+### Summary
+
+Removed backend Playwright/Jinja PDF generation, standardized tailored output on JSON Resume, added an editable human-review gate, and moved schema validation plus final PDF rendering into Next.js with React PDF. See [`versions/v1.27.0.md`](versions/v1.27.0.md).
+
+---
+
+## [v1.26.0] - 2026-10-28
+
+### Summary
+
+Replaced every selectable resume design with one backend-owned A4 layout derived from `Joji A G_Master.pdf`; removed legacy template names, API fields, frontend selectors, alternate CSS, and multi-template tests. See [`versions/v1.26.0.md`](versions/v1.26.0.md).
+
+---
+
+## [v1.25.0] - 2026-10-28
+
+### Summary
+
+Redesigned resume-generation instructions around explicit evidence and added deterministic post-generation grounding that removes unsupported colleges, degrees, projects, internships, skills, contacts, bullets, and metrics before rendering. See [`versions/v1.25.0.md`](versions/v1.25.0.md).
+
+---
+
+## [v1.24.0] - 2026-10-28
+
+### Summary
+
+Replaced fixed word-window chunking for text and PDFs with local embedding-based semantic boundaries, and upgraded retrieval to configurable hybrid HNSW ANN dense search plus BM25 lexical scoring. See [`versions/v1.24.0.md`](versions/v1.24.0.md).
+
+---
+
+## [v1.23.0] - 2026-10-28
+
+### Summary
+
+Added deterministic redundancy controls across ChromaDB ingestion, structured-profile reconstruction, AI instructions, and PDF export so repeated internships, projects, and achievements are consolidated into concise bullet points. See [`versions/v1.23.0.md`](versions/v1.23.0.md).
+
+---
+
+## [v1.22.0] - 2026-10-28
+
+### Summary
+
+Replaced senior-oriented job presets and recommendation defaults with AI/full-stack, Python backend, and React/UI-UX internships; constrained generated role matches to internship, graduate, trainee, junior, and entry-level opportunities. See [`versions/v1.22.0.md`](versions/v1.22.0.md).
+
+---
+
+## [v1.21.0] - 2026-10-28
+
+### Summary
+
+Added selectable Groq Cloud and Ollama Local inference, including server-only credentials, explicit cloud privacy disclosure, cloud-only no-Ollama startup, provider health telemetry, model allow-listing, rate-limit retry, and deterministic non-GPU fallback behavior. See [`versions/v1.21.0.md`](versions/v1.21.0.md).
+
+---
+
 ## [v1.20.0] - 2026-09-24
 
 ### Summary
