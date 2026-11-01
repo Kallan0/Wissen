@@ -25,6 +25,7 @@ const styles = StyleSheet.create({
   skillRow: { flexDirection: "row", marginBottom: 2 },
   skillName: { width: 130, fontFamily: "Times-Bold" },
   skillKeywords: { flex: 1 },
+  educationDetail: { marginTop: 1 },
 });
 
 function displayDate(item: { startDate?: string; endDate?: string; custom?: JSONResumeCustomData }): string {
@@ -114,7 +115,8 @@ export function ResumePdfDocument({ resume }: { resume: ResumeData }) {
               <Text style={styles.entryMain}><Text style={styles.bold}>{item.institution}</Text>{item.custom?.wissenPress?.location ? ` - ${item.custom.wissenPress.location}` : ""}</Text>
               <Text style={styles.date}>{displayDate(item)}</Text>
             </View>
-            <View style={styles.entryLine}><Text>{[item.studyType, item.area].filter(Boolean).join(" in ")}</Text><Text>{item.score}</Text></View>
+            <Text style={styles.educationDetail}>{[item.studyType, item.area].filter(Boolean).join(" in ")}</Text>
+            {item.score ? <Text style={styles.educationDetail}>{item.score}</Text> : null}
           </View>)}
         </View> : null}
       </Page>

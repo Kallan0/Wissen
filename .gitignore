@@ -26,6 +26,7 @@ frontend/*.tsbuildinfo
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+tmp/
 
 # --- Environment & Credentials ---
 .env
@@ -41,5 +42,6 @@ desktop.ini
 .vscode/
 .idea/
 *.swp
+~$*.docx
 .pytest_cache/
 pytest-cache-files-*/

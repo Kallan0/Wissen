@@ -1,4 +1,4 @@
-from ai.generator import enforce_grounded_resume
+from ai.generator import ResumeGenerator, enforce_grounded_resume
 from ai.prompts import STRICT_SYSTEM_PROMPT
 from rag.retriever import RAGRetriever
 
@@ -104,3 +104,61 @@ def test_raw_document_profile_extracts_verified_identity_without_inventing_recor
     assert profile["candidate"]["email"] == "joji@example.com"
     assert profile["candidate"]["phone"] == "+91 9400776781"
     assert profile["experiences"] == []
+
+
+def test_fallback_resume_limits_and_ranks_verified_projects(monkeypatch):
+    from rag.vectorstore import vector_store
+
+    projects = [
+        {
+            "name": f"Unrelated Repository {index}",
+            "description": "No description provided.",
+            "technologies": ["CSS"],
+            "bullets": ["Repository metrics: 0 GitHub stars, 0 forks."],
+        }
+        for index in range(8)
+    ]
+    projects.extend([
+        {
+            "name": "Grounded Resume Builder",
+            "description": "Built a FastAPI and React RAG application.",
+            "technologies": ["Python", "FastAPI", "React", "ChromaDB"],
+            "bullets": ["Implemented hybrid retrieval and grounded resume generation."],
+        },
+        {
+            "name": "Application Tracker",
+            "description": "Built a React dashboard with a FastAPI backend.",
+            "technologies": ["React", "FastAPI", "Python"],
+            "bullets": ["Added tests and database-backed application tracking."],
+        },
+        {
+            "name": "API Test Harness",
+            "description": "Tested REST APIs with Python.",
+            "technologies": ["Python", "pytest"],
+            "bullets": ["Automated API validation."],
+        },
+    ])
+    monkeypatch.setattr(vector_store, "get_candidate_profile", lambda: {
+        "exists": True,
+        "candidate": {"name": "Verified Candidate"},
+        "experiences": [],
+        "projects": projects,
+        "skills": [
+            {"category": "Backend", "items": ["Python", "FastAPI"]},
+            {"category": "Frontend", "items": ["React", "CSS"]},
+        ],
+        "education": [],
+        "raw_documents": [],
+    })
+
+    result = ResumeGenerator()._build_fallback_resume(
+        "Python FastAPI React intern building REST APIs with testing and RAG",
+        "Full-Stack Engineering Intern",
+        {},
+        "",
+    )
+
+    assert len(result["projects"]) == 3
+    assert {project["name"] for project in result["projects"]} == {
+        "Grounded Resume Builder", "Application Tracker", "API Test Harness"
+    }

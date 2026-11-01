@@ -521,33 +521,82 @@ class ResumeGenerator:
                     "bullets": doc_lines[:4]
                 })
 
-        # Extract projects from candidate's ingested vector DB
-        projects = []
-        for proj in prof_data.get("projects", []):
+        relevance_tokens = {
+            token for token in _evidence_key(f"{target_role} {job_description}").split()
+            if len(token) > 2 and token not in _GROUNDING_STOPWORDS
+        }
+
+        # Rank verified projects for the target role instead of dumping the
+        # entire portfolio into a resume when an LLM provider is unavailable.
+        project_candidates = []
+        for source_index, proj in enumerate(prof_data.get("projects", [])):
             if not proj.get("name"):
                 continue
-            project_bullets = proj.get("bullets") or ([proj.get("description")] if proj.get("description") else [])
-            projects.append({
+            raw_project_bullets = proj.get("bullets") or ([proj.get("description")] if proj.get("description") else [])
+            project_bullets = [
+                value for value in raw_project_bullets
+                if str(value).strip() and not str(value).lower().startswith((
+                    "repository metrics:", "core programming language:", "readme summary:"
+                ))
+            ]
+            description = str(proj.get("description") or "").strip()
+            if description.lower().startswith("project:") or description.lower() == "no description provided.":
+                description = ""
+            technologies = proj.get("technologies") or []
+            evidence_text = " ".join([
+                str(proj.get("name") or ""),
+                description,
+                " ".join(str(value) for value in technologies),
+                " ".join(str(value) for value in project_bullets),
+            ])
+            matched_terms = len(relevance_tokens.intersection(_evidence_key(evidence_text).split()))
+            substantive_bullets = len(project_bullets)
+            quality_score = substantive_bullets * 3 + min(len(technologies), 5)
+            project_candidates.append((matched_terms * 10 + quality_score, source_index, {
                 "name": proj.get("name"),
-                "description": proj.get("description") or "",
-                "technologies": proj.get("technologies") or [],
+                "description": description,
+                "technologies": technologies,
                 "bullets": project_bullets[:3],
                 "link": proj.get("link") or ""
-            })
+            }))
+        project_candidates.sort(key=lambda candidate: (-candidate[0], candidate[1]))
+        projects = [candidate[2] for candidate in project_candidates[:3]]
 
-        # Extract skills from candidate's ingested vector DB
-        skills = prof_data.get("skills", [])
+        # Keep the most role-relevant skill groups within a readable resume.
+        skill_candidates = []
+        for source_index, group in enumerate(prof_data.get("skills", [])):
+            if not isinstance(group, dict):
+                continue
+            category = str(group.get("category") or "Verified Skills").strip()
+            if category.lower().startswith("github repositories"):
+                continue
+            items = [str(value).strip() for value in group.get("items", []) if str(value).strip()]
+            if not items:
+                continue
+            group_text = f"{group.get('category', '')} {' '.join(items)}"
+            category_matches = len(relevance_tokens.intersection(_evidence_key(category).split()))
+            item_matches = len(relevance_tokens.intersection(_evidence_key(group_text).split()))
+            score = category_matches * 3 + item_matches
+            skill_candidates.append((score, source_index, {
+                "category": category,
+                "items": items[:10],
+            }))
+        skill_candidates.sort(key=lambda candidate: (-candidate[0], candidate[1]))
+        skills = [candidate[2] for candidate in skill_candidates[:6]]
 
         # Extract education from candidate's ingested vector DB
         education = []
         for edu in prof_data.get("education", []):
             if not edu.get("institution") or not edu.get("degree"):
                 continue
+            details = str(edu.get("details") or "").strip()
+            if details.lower().startswith("education:"):
+                details = ""
             education.append({
                 "institution": edu.get("institution"),
                 "degree": edu.get("degree"),
                 "year": edu.get("year") or "",
-                "details": edu.get("details") or ""
+                "details": details,
             })
 
         verified_summary = ""
