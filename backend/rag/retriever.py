@@ -1,5 +1,6 @@
 from typing import List, Dict, Any
 import re
+from config import settings
 from rag.vectorstore import vector_store
 
 class RAGRetriever:
@@ -21,39 +22,91 @@ class RAGRetriever:
         sorted_words = sorted(freq.items(), key=lambda x: x[1], reverse=True)
         return [w[0] for w in sorted_words[:top_n]]
 
-    def retrieve_context_for_jd(self, job_description: str, top_k_per_cat: int = 4) -> Dict[str, Any]:
+    def retrieve_context_for_jd(
+        self,
+        job_description: str,
+        expanded_concepts: List[str] | None = None,
+        top_k_per_cat: int = 6,
+    ) -> Dict[str, Any]:
         """
         Retrieves relevant experiences, projects, and skills tailored to the target Job Description.
         """
+        expanded_concepts = expanded_concepts or []
+        query_text = job_description
+        if expanded_concepts:
+            query_text += "\nRelated concepts: " + ", ".join(expanded_concepts)
+
         # Query experiences
-        exp_results = self.db.query(job_description, collection_names=["experiences"], n_results=top_k_per_cat * 2)
+        exp_results = self.db.query(query_text, collection_names=["experiences"], n_results=top_k_per_cat * 2)
         # Query projects
-        proj_results = self.db.query(job_description, collection_names=["projects"], n_results=top_k_per_cat)
+        proj_results = self.db.query(query_text, collection_names=["projects"], n_results=top_k_per_cat)
         # Query skills
-        skill_results = self.db.query(job_description, collection_names=["skills"], n_results=top_k_per_cat)
+        skill_results = self.db.query(query_text, collection_names=["skills"], n_results=top_k_per_cat)
         # Query education
-        edu_results = self.db.query(job_description, collection_names=["education"], n_results=2)
+        edu_results = self.db.query(query_text, collection_names=["education"], n_results=3)
         # Query raw docs (bio, notes)
-        doc_results = self.db.query(job_description, collection_names=["raw_documents"], n_results=2)
+        doc_results = self.db.query(query_text, collection_names=["raw_documents"], n_results=top_k_per_cat * 2)
+
+        # Relevance controls ordering, but resume generation also needs complete
+        # candidate coverage. Include verified source sections that semantic
+        # ranking did not return, subject to the context budget below.
+        try:
+            all_items = self.db.get_all_items()
+            seen_ids = {item.get("id") for item in doc_results}
+            seen_content = {str(item.get("content") or "").strip() for item in doc_results}
+            for item in all_items.get("raw_documents", []):
+                content = str(item.get("document") or "").strip()
+                if not content or item.get("id") in seen_ids or content in seen_content:
+                    continue
+                doc_results.append({
+                    "id": item.get("id", ""),
+                    "collection": "raw_documents",
+                    "content": content,
+                    "metadata": item.get("metadata") or {},
+                    "similarity": 0.0,
+                    "dense_score": 0.0,
+                    "bm25_score": 0.0,
+                    "retrieval_method": "complete_profile_coverage",
+                })
+                seen_ids.add(item.get("id"))
+                seen_content.add(content)
+        except (AttributeError, TypeError):
+            pass
 
         # Build clean formatted text context for the LLM
         formatted_context_lines = []
+        context_chars = 0
+
+        def append_context(line: str) -> bool:
+            nonlocal context_chars
+            additional = len(line) + 1
+            if context_chars + additional > settings.RAG_MAX_CONTEXT_CHARS:
+                return False
+            formatted_context_lines.append(line)
+            context_chars += additional
+            return True
         
-        formatted_context_lines.append("=== VERIFIED WORK EXPERIENCE ACHIEVEMENTS ===")
+        append_context("=== VERIFIED WORK EXPERIENCE ACHIEVEMENTS ===")
         for item in exp_results:
-            formatted_context_lines.append(f"- {item['content']} (Relevance Score: {item['similarity']})")
+            append_context(f"- {item['content']} (Relevance Score: {item['similarity']})")
 
-        formatted_context_lines.append("\n=== VERIFIED TECHNICAL PROJECTS ===")
+        append_context("\n=== VERIFIED TECHNICAL PROJECTS ===")
         for item in proj_results:
-            formatted_context_lines.append(f"- {item['content']} (Relevance Score: {item['similarity']})")
+            append_context(f"- {item['content']} (Relevance Score: {item['similarity']})")
 
-        formatted_context_lines.append("\n=== VERIFIED CANDIDATE SKILLS ===")
+        append_context("\n=== VERIFIED CANDIDATE SKILLS ===")
         for item in skill_results:
-            formatted_context_lines.append(f"- {item['content']}")
+            append_context(f"- {item['content']}")
 
-        formatted_context_lines.append("\n=== VERIFIED EDUCATION & CREDENTIALS ===")
+        append_context("\n=== VERIFIED EDUCATION & CREDENTIALS ===")
         for item in edu_results:
-            formatted_context_lines.append(f"- {item['content']}")
+            append_context(f"- {item['content']}")
+
+        append_context("\n=== VERIFIED SOURCE DOCUMENT EXCERPTS ===")
+        included_doc_ids = set()
+        for item in doc_results:
+            if append_context(f"- {item['content']} (Relevance Score: {item['similarity']})"):
+                included_doc_ids.add(item.get("id"))
 
         all_matches = exp_results + proj_results + skill_results + edu_results + doc_results
 
@@ -61,7 +114,16 @@ class RAGRetriever:
             "formatted_context": "\n".join(formatted_context_lines),
             "retrieved_items": all_matches,
             "extracted_keywords": self.extract_keywords(job_description),
-            "match_count": len(all_matches)
+            "expanded_concepts": expanded_concepts,
+            "match_count": len(all_matches),
+            "retrieval_strategy": "hybrid_hnsw_ann_bm25",
+            "context_metrics": {
+                "characters": context_chars,
+                "approximate_tokens": max(1, round(context_chars / 4)),
+                "source_sections_available": len(doc_results),
+                "source_sections_included": len(included_doc_ids),
+                "max_characters": settings.RAG_MAX_CONTEXT_CHARS,
+            },
         }
 
 rag_retriever = RAGRetriever()

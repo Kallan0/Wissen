@@ -70,10 +70,10 @@
     {
       "name": "Local AI Resume Tailor",
       "description": "Privacy-first offline resume generator utilizing local LLMs and vector search to align verified career milestones with job descriptions.",
-      "technologies": ["Next.js", "FastAPI", "ChromaDB", "Ollama", "Playwright"],
+      "technologies": ["Next.js", "FastAPI", "ChromaDB", "Ollama", "JSON Resume", "React PDF"],
       "highlights": [
         "Automated semantic chunking and cosine similarity retrieval across candidate repositories, projects, and work history.",
-        "Integrated Playwright for automated headless browser generation of pixel-perfect A4/Letter PDF resumes with custom styling."
+        "Implemented schema-validated, human-reviewed PDF export in Next.js using JSON Resume and React PDF."
       ],
       "link": "https://github.com/jojidev/resume-builder"
     },
