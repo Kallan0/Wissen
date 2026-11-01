@@ -25,6 +25,27 @@ export default function RetrievalMatches({ context }: RetrievalMatchesProps) {
         </span>
       </div>
 
+      {context.context_metrics && (
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <div className="rounded border border-ink/20 bg-paper p-2 font-mono text-[10px] text-ink">
+            <div className="font-bold">{context.context_metrics.source_sections_included}/{context.context_metrics.source_sections_available}</div>
+            <div className="uppercase text-ink-muted">Source sections</div>
+          </div>
+          <div className="rounded border border-ink/20 bg-paper p-2 font-mono text-[10px] text-ink">
+            <div className="font-bold">~{context.context_metrics.approximate_tokens.toLocaleString()}</div>
+            <div className="uppercase text-ink-muted">Context tokens</div>
+          </div>
+          <div className="rounded border border-ink/20 bg-paper p-2 font-mono text-[10px] text-ink">
+            <div className="font-bold">{context.context_metrics.characters.toLocaleString()}</div>
+            <div className="uppercase text-ink-muted">Characters</div>
+          </div>
+          <div className="rounded border border-ink/20 bg-paper p-2 font-mono text-[10px] text-ink">
+            <div className="font-bold">Complete</div>
+            <div className="uppercase text-ink-muted">Coverage mode</div>
+          </div>
+        </div>
+      )}
+
       {/* Keywords matched */}
       {context.keywords && context.keywords.length > 0 && (
         <div>
@@ -39,6 +60,22 @@ export default function RetrievalMatches({ context }: RetrievalMatchesProps) {
                 className="bg-manila text-ink font-mono text-xs px-2 py-0.5 rounded border border-ink/30"
               >
                 {kw}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {context.expanded_concepts && context.expanded_concepts.length > 0 && (
+        <div>
+          <div className="mb-1.5 flex items-center gap-1 font-mono text-[10px] font-bold uppercase tracking-wider text-ink-muted">
+            <Sparkles className="h-3 w-3 text-fountain-teal" />
+            LLM Query Expansion
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {context.expanded_concepts.map((concept, index) => (
+              <span key={index} className="rounded border border-fountain-teal/40 bg-fountain-teal/10 px-2 py-0.5 font-mono text-xs text-ink">
+                {concept}
               </span>
             ))}
           </div>

@@ -9,6 +9,8 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@jsonresume/schema": "^1.7.0",
+    "@react-pdf/renderer": "^4.9.0",
     "clsx": "^2.1.1",
     "lucide-react": "^0.368.0",
     "next": "^14.2.23",

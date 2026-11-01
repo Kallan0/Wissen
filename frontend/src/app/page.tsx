@@ -106,7 +106,7 @@ export default function Home() {
         </main>
 
         <footer className="border-t-2 border-ink/10 bg-transparent py-5 text-center font-mono text-xs text-ink-muted">
-          Wissen Press &bull; Privacy-First Local AI Resume Synthesizer
+          Wissen Press &bull; Local-first RAG with selectable offline or cloud inference
         </footer>
       </div>
     </div>

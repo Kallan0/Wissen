@@ -6,7 +6,7 @@ import EmptyKBBanner from "@/components/EmptyKBBanner";
 import ProfileQuestionnaireModal from "@/components/ProfileQuestionnaireModal";
 import ATSGapAnalyzer from "@/components/ATSGapAnalyzer";
 import CoverLetterModal from "@/components/CoverLetterModal";
-import { tailorResume, fetchKBProfile, analyzeATSGap, generateCoverLetter } from "@/lib/api";
+import { tailorResume, fetchKBProfile, analyzeATSGap, generateCoverLetter, formatModelLabel, isCloudModel } from "@/lib/api";
 import { TailorResponse, ATSAnalysisResponse, CoverLetterResponse } from "@/lib/types";
 
 interface JobTailorProps {
@@ -18,28 +18,40 @@ interface JobTailorProps {
 
 const SAMPLE_JDS = [
   {
-    label: "[REF-01] Senior AI & RAG Engineer",
-    role: "Senior AI / Full-Stack Engineer",
+    label: "[REF-01] AI & RAG Engineering Intern",
+    role: "AI / Full-Stack Engineering Intern",
     text: `About the Role:
-We are seeking an experienced Senior Full-Stack Engineer to architect our next-generation privacy-first AI intelligence platform. You will be responsible for designing high-performance backend microservices in Python (FastAPI), connecting retrieval-augmented generation (RAG) pipelines using ChromaDB and local LLMs (Ollama / Llama 3), and delivering polished web applications with Next.js and Tailwind CSS.
+We are looking for an AI and Full-Stack Engineering Intern to support a privacy-conscious AI application. You will learn by contributing to Python/FastAPI endpoints, retrieval-augmented generation pipelines using ChromaDB, and responsive interfaces built with React or Next.js.
 
 Requirements:
-- 4+ years building production web platforms with Python (FastAPI/Flask) and TypeScript (React/Next.js).
-- Deep experience with Vector Databases (ChromaDB, Pinecone, or pgvector) and RAG document ingestion pipelines.
-- Familiarity running local open-weights LLMs (Ollama, vLLM, LangChain) with zero external data leaks.
-- Strong grounding in headless browser PDF generation and automated test workflows.`,
+- Student, recent graduate, or self-taught developer with Python and JavaScript/TypeScript fundamentals.
+- Coursework or personal projects using FastAPI, React, Next.js, databases, or REST APIs.
+- Interest in RAG, vector databases, local/cloud LLMs, and responsible handling of user data.
+- Willingness to learn through code reviews, testing, documentation, and team collaboration.`,
   },
   {
-    label: "[REF-02] Python Systems Architect",
-    role: "Senior Python Backend Engineer",
+    label: "[REF-02] Python Backend Intern",
+    role: "Python Backend Developer Intern",
     text: `Job Description:
-We are hiring a Senior Python Backend Developer to design high-throughput microservices, optimize distributed database schemas, and build resilient ETL pipelines. 
+We are hiring a Python Backend Developer Intern to help build and test API services, data-processing utilities, and database-backed application features under the guidance of experienced engineers.
 
 Key Responsibilities:
-- Build low-latency asynchronous APIs with FastAPI and Uvicorn.
-- Manage persistent caching with Redis and schema migrations with PostgreSQL.
-- Implement robust telemetry, unit test suites, and Dockerized deployments.
-- Collaborate with frontend engineers to expose clean RESTful endpoints.`,
+- Assist with REST API development using Python, FastAPI, and Uvicorn.
+- Write and maintain unit tests, documentation, and basic database queries.
+- Learn PostgreSQL, Docker, caching, logging, and deployment practices.
+- Collaborate with frontend developers and respond constructively to code review feedback.`,
+  },
+  {
+    label: "[REF-03] Frontend & UI/UX Intern",
+    role: "React / UI-UX Design Intern",
+    text: `About the Internship:
+We are seeking a Frontend and UI/UX Intern to help turn product requirements and Figma concepts into accessible, responsive web interfaces using React, Next.js, TypeScript, and Tailwind CSS.
+
+Requirements:
+- Portfolio, coursework, or personal projects demonstrating frontend or interface-design fundamentals.
+- Familiarity with HTML, CSS, JavaScript/TypeScript, React, or Figma.
+- Interest in responsive design, reusable components, accessibility, and design systems.
+- Ability to explain design decisions, accept feedback, and learn within a collaborative product team.`,
   },
 ];
 
@@ -47,7 +59,6 @@ export default function JobTailor({ models, onTailored, initialRole, initialJd }
   const [jobDescription, setJobDescription] = useState(initialJd || SAMPLE_JDS[0].text);
   const [targetRole, setTargetRole] = useState(initialRole || SAMPLE_JDS[0].role);
   const [selectedModel, setSelectedModel] = useState(models[0] || "llama3");
-  const [template, setTemplate] = useState("vintage");
   const [candidateName, setCandidateName] = useState("");
   const [candidateEmail, setCandidateEmail] = useState("");
   const [candidateLocation, setCandidateLocation] = useState("");
@@ -112,8 +123,7 @@ export default function JobTailor({ models, onTailored, initialRole, initialJd }
         targetRole,
         selectedModel,
         candidateName,
-        candidateEmail,
-        template
+        candidateEmail
       );
       onTailored(result);
     } catch (err: any) {
@@ -190,7 +200,7 @@ export default function JobTailor({ models, onTailored, initialRole, initialJd }
               Tailor Resume to Job Description
             </h2>
             <p className="text-xs sm:text-sm text-ink-muted font-serif italic mt-1 max-w-2xl">
-              ChromaDB performs vector similarity retrieval against your verified career database, and the local Ollama LLM synthesizes an ATS-optimized tactile CV.
+              ChromaDB retrieves verified career evidence, then your selected local Ollama or Groq Cloud model synthesizes an ATS-optimized tactile CV.
             </p>
           </div>
 
@@ -237,14 +247,14 @@ export default function JobTailor({ models, onTailored, initialRole, initialJd }
               type="text"
               value={targetRole}
               onChange={(e) => setTargetRole(e.target.value)}
-              placeholder="e.g. Senior Full-Stack Engineer"
+              placeholder="e.g. Python Backend Developer Intern"
               className="w-full font-mono text-xs px-3 py-2 border-2 border-ink rounded bg-[#fffdf9] text-ink focus:outline-none focus:ring-2 focus:ring-terracotta"
             />
           </div>
 
           <div className="bg-manila/50 p-4 rounded-lg border-2 border-ink shadow-press">
             <label className="block font-mono text-[11px] font-bold text-ink mb-1.5 uppercase tracking-wider">
-              [02] Local Ollama Engine
+              [02] Inference Engine
             </label>
             <select
               value={selectedModel}
@@ -254,7 +264,7 @@ export default function JobTailor({ models, onTailored, initialRole, initialJd }
               {models.length > 0 ? (
                 models.map((m) => (
                   <option key={m} value={m}>
-                    {m} (Active)
+                    {formatModelLabel(m)}
                   </option>
                 ))
               ) : (
@@ -263,20 +273,6 @@ export default function JobTailor({ models, onTailored, initialRole, initialJd }
             </select>
           </div>
 
-          <div className="bg-manila/50 p-4 rounded-lg border-2 border-ink shadow-press">
-            <label className="block font-mono text-[11px] font-bold text-ink mb-1.5 uppercase tracking-wider">
-              [03] Typography & Layout
-            </label>
-            <select
-              value={template}
-              onChange={(e) => setTemplate(e.target.value)}
-              className="w-full font-mono text-xs px-3 py-2 border-2 border-ink rounded bg-[#fffdf9] text-ink focus:outline-none focus:ring-2 focus:ring-terracotta"
-            >
-              <option value="vintage">Wissen Vintage Press (Tactile Editorial)</option>
-              <option value="modern">Modern Tech (Clean Blue Accent)</option>
-              <option value="minimal">Minimalist Executive (Serif Monochrome)</option>
-            </select>
-          </div>
         </div>
 
         {/* Candidate Information Docket */}
@@ -348,7 +344,9 @@ export default function JobTailor({ models, onTailored, initialRole, initialJd }
           <div className="flex items-center gap-2">
             <span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-600 animate-pulse" />
             <span className="font-mono text-[11px] text-ink-muted uppercase tracking-wider">
-              Local Ollama Inference Engine &bull; Zero External Telemetry
+              {isCloudModel(selectedModel)
+                ? "Groq Cloud Inference • Job and verified profile context leave this device"
+                : "Local Ollama Inference • Data remains on this device"}
             </span>
           </div>
 

@@ -15,7 +15,24 @@ import {
   FineTuningStatus,
 } from "./types";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8002";
+const REQUIRED_API_REVISION = "logical-chunks-query-expansion-v1";
+
+async function assertCompatibleBackend(): Promise<void> {
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE}/api/version`, { cache: "no-store" });
+  } catch {
+    throw new Error(`Cannot reach the updated backend at ${API_BASE}. Start the app with npm run dev.`);
+  }
+  if (!response.ok) {
+    throw new Error(`An outdated backend is running at ${API_BASE}. Stop it and restart with npm run dev.`);
+  }
+  const version = await response.json();
+  if (version.api_revision !== REQUIRED_API_REVISION) {
+    throw new Error(`Backend revision mismatch at ${API_BASE}. Restart the application before generating a resume.`);
+  }
+}
 
 export async function fetchHealth(): Promise<HealthResponse> {
   const res = await fetch(`${API_BASE}/api/health`);
@@ -28,6 +45,16 @@ export async function fetchModels(): Promise<string[]> {
   if (!res.ok) return ["llama3"];
   const data = await res.json();
   return data.models || ["llama3"];
+}
+
+export function formatModelLabel(model: string): string {
+  if (model.startsWith("groq::")) return `Groq Cloud — ${model.slice("groq::".length)}`;
+  if (model.startsWith("ollama::")) return `Ollama Local — ${model.slice("ollama::".length)}`;
+  return `Ollama Local — ${model}`;
+}
+
+export function isCloudModel(model: string): boolean {
+  return model.startsWith("groq::");
 }
 
 export async function fetchKBStats(): Promise<KnowledgeBaseStats> {
@@ -106,9 +133,9 @@ export async function tailorResume(
   targetRole = "Software Engineer",
   model = "llama3",
   candidateName?: string,
-  candidateEmail?: string,
-  template = "modern"
+  candidateEmail?: string
 ): Promise<TailorResponse> {
+  await assertCompatibleBackend();
   const res = await fetch(`${API_BASE}/api/tailor`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -118,7 +145,6 @@ export async function tailorResume(
       model,
       candidate_name: candidateName,
       candidate_email: candidateEmail,
-      template,
     }),
   });
   if (!res.ok) {
@@ -128,42 +154,17 @@ export async function tailorResume(
   return res.json();
 }
 
-export async function exportPDF(resumeData: ResumeData, template = "modern"): Promise<{ filename: string; download_url: string }> {
-  const res = await fetch(`${API_BASE}/api/export-pdf`, {
+export async function exportPDF(resumeData: ResumeData): Promise<Blob> {
+  const res = await fetch(`/api/export-pdf`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      resume_data: resumeData,
-      template,
-    }),
+    body: JSON.stringify({ resume_data: resumeData }),
   });
   if (!res.ok) {
     const err = await res.text();
     throw new Error(`PDF export failed: ${err}`);
   }
-  return res.json();
-}
-
-export async function renderResumeHTML(
-  resumeData: ResumeData,
-  template = "modern",
-  signal?: AbortSignal
-): Promise<string> {
-  const res = await fetch(`${API_BASE}/api/render-resume-html`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ resume_data: resumeData, template }),
-    signal,
-  });
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(err || "Failed to render resume preview");
-  }
-  return res.text();
-}
-
-export function getDownloadUrl(filename: string): string {
-  return `${API_BASE}/api/download-pdf/${filename}`;
+  return res.blob();
 }
 
 export async function fetchCareerRecommendations(model = "llama3"): Promise<CareerRecommendationsResponse> {

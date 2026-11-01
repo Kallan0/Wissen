@@ -1,253 +1,83 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import React, { useEffect, useState } from "react";
-import { AlertCircle, CheckCircle, Download, Edit3, Eye, FolderOpen, ScrollText, Sparkles, X } from "lucide-react";
-import { exportPDF, getDownloadUrl, renderResumeHTML } from "@/lib/api";
+import { AlertCircle, CheckCircle, Download, Edit3, Eye, FileJson, FolderOpen, Plus, ScrollText, Sparkles, Trash2, X } from "lucide-react";
+import { exportPDF } from "@/lib/api";
 import { ResumeData } from "@/lib/types";
 
-type ResumeTemplate = "vintage" | "modern" | "minimal";
+const ResumePdfViewer = dynamic(() => import("./ResumePdfViewer"), {
+  ssr: false,
+  loading: () => <div className="flex min-h-[720px] items-center justify-center font-mono text-xs text-ink-muted">Rendering JSON Resume preview...</div>,
+});
 
-function SaveAsModal({ suggestedName, downloadUrl, onClose }: {
-  suggestedName: string;
-  downloadUrl: string;
-  onClose: () => void;
-}) {
+const inputClass = "w-full rounded-lg border-2 border-ink bg-paper px-3 py-2 font-serif text-sm text-ink focus:outline-none focus:ring-2 focus:ring-terracotta/40";
+
+function SaveAsModal({ suggestedName, downloadUrl, onClose }: { suggestedName: string; downloadUrl: string; onClose: () => void }) {
   const [filename, setFilename] = useState(suggestedName);
-
   const triggerDownload = () => {
-    const trimmedName = filename.trim();
     const anchor = document.createElement("a");
     anchor.href = downloadUrl;
-    anchor.download = trimmedName.endsWith(".pdf") ? trimmedName : `${trimmedName}.pdf`;
+    anchor.download = filename.trim().endsWith(".pdf") ? filename.trim() : `${filename.trim()}.pdf`;
     document.body.appendChild(anchor);
     anchor.click();
     document.body.removeChild(anchor);
     onClose();
   };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/60 backdrop-blur-sm">
-      <div className="mx-4 w-full max-w-md overflow-hidden rounded-xl border-2 border-ink bg-[#fffdf9] shadow-dossier">
-        <div className="flex items-center justify-between bg-ink px-5 py-3 text-paper">
-          <div className="flex items-center gap-2">
-            <FolderOpen className="h-4 w-4 text-[#f5c842]" />
-            <span className="font-mono text-xs font-bold uppercase tracking-widest">Save PDF Document</span>
-          </div>
-          <button onClick={onClose} className="text-paper/60 hover:text-paper" aria-label="Close save dialog">
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-        <div className="space-y-4 p-6">
-          <div>
-            <label htmlFor="pdf-filename" className="mb-1.5 block font-mono text-[11px] font-bold uppercase tracking-widest text-ink">File Name</label>
-            <div className="flex items-center gap-2">
-              <input
-                id="pdf-filename"
-                type="text"
-                value={filename}
-                onChange={(event) => setFilename(event.target.value)}
-                onKeyDown={(event) => event.key === "Enter" && filename.trim() && triggerDownload()}
-                className="flex-1 rounded-lg border-2 border-ink bg-paper px-3 py-2.5 font-mono text-xs text-ink focus:outline-none focus:ring-2 focus:ring-terracotta/40"
-                placeholder="resume_candidate"
-                autoFocus
-              />
-              <span className="shrink-0 rounded-lg border-2 border-ink bg-manila px-2 py-2.5 font-mono text-xs text-ink-muted">.pdf</span>
-            </div>
-            <p className="mt-1.5 font-mono text-[10px] text-ink-muted">Saved to your browser&apos;s default Downloads folder.</p>
-          </div>
-          <div className="flex items-start gap-1.5 rounded-lg border border-ink/20 bg-manila/60 p-3 font-mono text-[10px] text-ink-muted">
-            <CheckCircle className="mt-0.5 h-3 w-3 shrink-0 text-fountain-teal" />
-            <span>The PDF is ready. Choose its name, then download it.</span>
-          </div>
-        </div>
-        <div className="flex justify-end gap-3 px-6 pb-5">
-          <button onClick={onClose} className="rounded-lg border-2 border-ink bg-paper px-4 py-2 font-mono text-xs font-bold text-ink shadow-press hover:bg-manila">Cancel</button>
-          <button
-            onClick={triggerDownload}
-            disabled={!filename.trim()}
-            className="flex items-center gap-2 rounded-lg border-2 border-ink bg-terracotta px-5 py-2 font-mono text-xs font-bold uppercase tracking-wider text-paper shadow-press hover:bg-[#b03d25] disabled:opacity-40"
-          >
-            <Download className="h-3.5 w-3.5" /> Download
-          </button>
-        </div>
-      </div>
+  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/60 backdrop-blur-sm">
+    <div className="mx-4 w-full max-w-md overflow-hidden rounded-xl border-2 border-ink bg-[#fffdf9] shadow-dossier">
+      <div className="flex items-center justify-between bg-ink px-5 py-3 text-paper"><div className="flex items-center gap-2"><FolderOpen className="h-4 w-4 text-[#f5c842]" /><span className="font-mono text-xs font-bold uppercase tracking-widest">Save reviewed PDF</span></div><button onClick={onClose} aria-label="Close save dialog"><X className="h-4 w-4" /></button></div>
+      <div className="space-y-4 p-6"><label className="block font-mono text-[11px] font-bold uppercase tracking-widest text-ink" htmlFor="pdf-filename">File name</label><div className="flex items-center gap-2"><input id="pdf-filename" className={inputClass} value={filename} onChange={(event) => setFilename(event.target.value)} /><span className="font-mono text-xs">.pdf</span></div><div className="flex gap-2 rounded-lg border border-ink/20 bg-manila/60 p-3 font-mono text-[10px] text-ink-muted"><CheckCircle className="h-3.5 w-3.5 shrink-0 text-fountain-teal" />This PDF was generated by Next.js from your reviewed JSON Resume.</div></div>
+      <div className="flex justify-end gap-3 px-6 pb-5"><button onClick={onClose} className="rounded-lg border-2 border-ink bg-paper px-4 py-2 font-mono text-xs font-bold shadow-press">Cancel</button><button onClick={triggerDownload} disabled={!filename.trim()} className="flex items-center gap-2 rounded-lg border-2 border-ink bg-terracotta px-5 py-2 font-mono text-xs font-bold uppercase text-paper shadow-press disabled:opacity-40"><Download className="h-3.5 w-3.5" />Download</button></div>
     </div>
-  );
+  </div>;
 }
 
-interface ResumePreviewProps {
-  resume: ResumeData | null;
-  onUpdateResume: (updated: ResumeData) => void;
+function TextField({ label, value, onChange }: { label: string; value?: string; onChange: (value: string) => void }) {
+  return <label className="space-y-1"><span className="font-mono text-[10px] font-bold uppercase tracking-wider text-ink-muted">{label}</span><input className={inputClass} value={value || ""} onChange={(event) => onChange(event.target.value)} /></label>;
 }
 
-const templateOptions: Array<{ value: ResumeTemplate; label: string }> = [
-  { value: "vintage", label: "[01] Vintage Press" },
-  { value: "modern", label: "[02] Modern Tech" },
-  { value: "minimal", label: "[03] Minimalist" },
-];
+function HighlightsEditor({ values, onChange }: { values?: string[]; onChange: (values: string[]) => void }) {
+  const items = values || [];
+  return <div className="space-y-2">{items.map((value, index) => <div className="flex items-start gap-2" key={index}><textarea aria-label={`Bullet ${index + 1}`} rows={2} className={inputClass} value={value} onChange={(event) => onChange(items.map((item, itemIndex) => itemIndex === index ? event.target.value : item))} /><button type="button" aria-label={`Remove bullet ${index + 1}`} onClick={() => onChange(items.filter((_, itemIndex) => itemIndex !== index))} className="rounded-lg border-2 border-ink bg-paper p-2 text-red-700 shadow-press"><Trash2 className="h-3.5 w-3.5" /></button></div>)}<button type="button" onClick={() => onChange([...items, ""])} className="inline-flex items-center gap-1 rounded-lg border-2 border-ink bg-manila px-3 py-1.5 font-mono text-[10px] font-bold uppercase shadow-press"><Plus className="h-3 w-3" />Add bullet</button></div>;
+}
+
+interface ResumePreviewProps { resume: ResumeData | null; onUpdateResume: (updated: ResumeData) => void }
 
 export default function ResumePreview({ resume, onUpdateResume }: ResumePreviewProps) {
-  const [template, setTemplate] = useState<ResumeTemplate>("vintage");
-  const [isEditing, setIsEditing] = useState(false);
+  const [isEditing, setIsEditing] = useState(true);
+  const [reviewConfirmed, setReviewConfirmed] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [saveAsModal, setSaveAsModal] = useState<{ url: string; suggestedName: string } | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
-  const [previewHtml, setPreviewHtml] = useState("");
-  const [previewError, setPreviewError] = useState<string | null>(null);
-  const [previewLoading, setPreviewLoading] = useState(false);
 
-  useEffect(() => {
-    if (!resume) {
-      setPreviewHtml("");
-      setPreviewError(null);
-      return;
-    }
-    const controller = new AbortController();
-    const timer = window.setTimeout(async () => {
-      setPreviewLoading(true);
-      setPreviewError(null);
-      try {
-        setPreviewHtml(await renderResumeHTML(resume, template, controller.signal));
-      } catch (error) {
-        if (!controller.signal.aborted) {
-          setPreviewError(error instanceof Error ? error.message : "Failed to render resume preview");
-        }
-      } finally {
-        if (!controller.signal.aborted) setPreviewLoading(false);
-      }
-    }, 200);
-    return () => {
-      window.clearTimeout(timer);
-      controller.abort();
-    };
-  }, [resume, template]);
+  useEffect(() => setReviewConfirmed(false), [resume]);
+  useEffect(() => () => { if (saveAsModal?.url) URL.revokeObjectURL(saveAsModal.url); }, [saveAsModal]);
 
-  if (!resume) {
-    return (
-      <div className="rounded-xl border-2 border-ink bg-[#fffdf9] p-12 text-center shadow-dossier sm:p-16">
-        <ScrollText className="mx-auto mb-4 h-14 w-14 text-ink-muted/50" />
-        <h3 className="font-serif text-xl font-bold text-ink">No Archival Resume Generated Yet</h3>
-        <p className="mx-auto mt-2 max-w-md font-serif text-sm italic leading-relaxed text-ink-muted">
-          Open the <strong className="font-mono not-italic text-terracotta">[02] Job Tailor</strong> dossier and generate an ATS-grounded CV.
-        </p>
-      </div>
-    );
-  }
+  if (!resume) return <div className="rounded-xl border-2 border-ink bg-[#fffdf9] p-12 text-center shadow-dossier sm:p-16"><ScrollText className="mx-auto mb-4 h-14 w-14 text-ink-muted/50" /><h3 className="font-serif text-xl font-bold text-ink">No resume generated yet</h3><p className="mx-auto mt-2 max-w-md font-serif text-sm italic text-ink-muted">Generate a grounded resume first. The JSON Resume editor will appear here before PDF export.</p></div>;
 
-  const buildSuggestedName = () => {
-    const namePart = (resume.name || "Candidate").trim().replace(/\s+/g, "_").replace(/[^a-zA-Z0-9_-]/g, "");
-    return `resume_${namePart}_${new Date().toISOString().slice(0, 10)}`;
-  };
+  const basics = resume.basics || {};
+  const updateBasics = (patch: Partial<NonNullable<ResumeData["basics"]>>) => onUpdateResume({ ...resume, basics: { ...basics, ...patch } });
+  const suggestedName = `resume_${(basics.name || "Candidate").replace(/\s+/g, "_").replace(/[^a-zA-Z0-9_-]/g, "")}_${new Date().toISOString().slice(0, 10)}`;
+  const handleExportPDF = async () => { setDownloading(true); setExportError(null); try { const blob = await exportPDF(resume); setSaveAsModal({ url: URL.createObjectURL(blob), suggestedName }); } catch (error) { setExportError(error instanceof Error ? error.message : "PDF export failed"); } finally { setDownloading(false); } };
+  const downloadJSON = () => { const url = URL.createObjectURL(new Blob([JSON.stringify(resume, null, 2)], { type: "application/json" })); const anchor = document.createElement("a"); anchor.href = url; anchor.download = `${suggestedName}.json`; anchor.click(); URL.revokeObjectURL(url); };
+  const closeModal = () => { if (saveAsModal?.url) URL.revokeObjectURL(saveAsModal.url); setSaveAsModal(null); };
+  const notes = resume.custom?.wissenPress?.tailoredMatchNotes || [];
+  const provider = resume.custom?.wissenPress?.aiProvider;
 
-  const handleExportPDF = async () => {
-    setDownloading(true);
-    setExportError(null);
-    try {
-      const result = await exportPDF(resume, template);
-      setSaveAsModal({ url: getDownloadUrl(result.filename), suggestedName: buildSuggestedName() });
-    } catch (error) {
-      setExportError(error instanceof Error ? error.message : "PDF export failed");
-    } finally {
-      setDownloading(false);
-    }
-  };
-
-  return (
-    <>
-      {saveAsModal && (
-        <SaveAsModal
-          suggestedName={saveAsModal.suggestedName}
-          downloadUrl={saveAsModal.url}
-          onClose={() => setSaveAsModal(null)}
-        />
-      )}
-      <div className="space-y-6">
-        <div className="flex flex-col items-center justify-between gap-4 rounded-xl border-2 border-ink bg-[#fffdf9] p-4 shadow-press-lg sm:flex-row">
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-1 rounded-lg border-2 border-ink bg-manila p-1">
-              {templateOptions.map((option) => (
-                <button
-                  key={option.value}
-                  onClick={() => setTemplate(option.value)}
-                  className={`rounded px-3 py-1 font-mono text-xs font-bold ${template === option.value ? "bg-terracotta text-paper shadow-press" : "text-ink hover:text-terracotta"}`}
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
-            <button
-              onClick={() => setIsEditing((current) => !current)}
-              className={`flex items-center gap-1.5 rounded-lg border-2 border-ink px-3 py-1.5 font-mono text-xs font-bold shadow-press ${isEditing ? "bg-vintage-gold text-ink" : "bg-paper text-ink hover:bg-manila"}`}
-            >
-              {isEditing ? <Eye className="h-3.5 w-3.5" /> : <Edit3 className="h-3.5 w-3.5" />}
-              {isEditing ? "READ VIEW" : "EDIT DRAFT"}
-            </button>
-          </div>
-          <div className="flex w-full items-center justify-end gap-3 sm:w-auto">
-            {resume._ai_provider && (
-              <span className="hidden rounded border border-ink bg-manila px-2.5 py-1 font-mono text-[11px] text-ink-muted md:inline">
-                ENGINE: <strong className="text-ink">{resume._ai_provider}</strong>
-              </span>
-            )}
-            <button
-              onClick={handleExportPDF}
-              disabled={downloading}
-              className="inline-flex items-center gap-2 rounded-lg border-2 border-ink bg-terracotta px-5 py-2 font-mono text-xs font-bold uppercase tracking-wider text-paper shadow-press hover:bg-[#b03d25] disabled:opacity-50"
-            >
-              {downloading ? <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-paper border-t-transparent" /> : <Download className="h-3.5 w-3.5" />}
-              {downloading ? "PRESSING PDF..." : "PRINT-READY PDF"}
-            </button>
-          </div>
-        </div>
-
-        {exportError && (
-          <div className="flex items-center gap-2 rounded-lg border-2 border-ink bg-red-50 p-3.5 font-mono text-xs text-red-800 shadow-press">
-            <AlertCircle className="h-4 w-4 shrink-0 text-red-500" />
-            <span className="flex-1">{exportError}</span>
-            <button onClick={() => setExportError(null)} aria-label="Dismiss export error"><X className="h-3.5 w-3.5" /></button>
-          </div>
-        )}
-
-        {resume.tailored_match_notes && resume.tailored_match_notes.length > 0 && (
-          <div className="rounded-xl border-2 border-ink bg-manila/70 p-4 shadow-press">
-            <div className="mb-2 flex items-center gap-2 font-mono text-xs font-bold uppercase tracking-wider text-ink">
-              <Sparkles className="h-4 w-4 text-terracotta" /> AI Tailoring Strategy &amp; Grounding Proofs
-            </div>
-            <ul className="list-inside list-disc space-y-1 font-serif text-xs text-ink-muted">
-              {resume.tailored_match_notes.map((note, index) => <li key={index}>{note}</li>)}
-            </ul>
-          </div>
-        )}
-
-        {isEditing && (
-          <div className="rounded-xl border-2 border-ink bg-[#fffdf9] p-4 shadow-press">
-            <label htmlFor="resume-summary-editor" className="mb-2 block font-mono text-xs font-bold uppercase tracking-wider text-ink">Professional Summary</label>
-            <textarea
-              id="resume-summary-editor"
-              rows={5}
-              value={resume.summary}
-              onChange={(event) => onUpdateResume({ ...resume, summary: event.target.value })}
-              className="w-full rounded-lg border-2 border-ink bg-paper p-3 font-serif text-sm text-ink focus:outline-none focus:ring-2 focus:ring-terracotta/40"
-            />
-            <p className="mt-2 font-mono text-[10px] text-ink-muted">The backend refreshes the print template after you pause typing.</p>
-          </div>
-        )}
-
-        <div className="relative min-h-[720px] overflow-hidden rounded-xl border-2 border-ink bg-[#fffdf9] shadow-dossier">
-          {previewLoading && <div className="absolute inset-x-0 top-0 z-10 h-1 animate-pulse bg-terracotta" />}
-          {previewError ? (
-            <div className="flex min-h-[720px] flex-col items-center justify-center p-10 text-center">
-              <AlertCircle className="mb-3 h-8 w-8 text-red-500" />
-              <h3 className="font-serif font-bold text-ink">Preview unavailable</h3>
-              <p className="mt-2 max-w-lg font-mono text-xs text-ink-muted">{previewError}</p>
-            </div>
-          ) : previewHtml ? (
-            <iframe title={`${template} resume preview`} srcDoc={previewHtml} sandbox="" className="block min-h-[1120px] w-full border-0 bg-white" />
-          ) : (
-            <div className="flex min-h-[720px] items-center justify-center font-mono text-xs text-ink-muted">Rendering backend template...</div>
-          )}
-        </div>
-      </div>
-    </>
-  );
+  return <>{saveAsModal ? <SaveAsModal suggestedName={saveAsModal.suggestedName} downloadUrl={saveAsModal.url} onClose={closeModal} /> : null}<div className="space-y-6">
+    <div className="flex flex-col justify-between gap-4 rounded-xl border-2 border-ink bg-[#fffdf9] p-4 shadow-press-lg sm:flex-row"><div className="flex flex-wrap items-center gap-3"><span className="rounded-lg border-2 border-ink bg-manila px-3 py-1.5 font-mono text-xs font-bold shadow-press">JSON RESUME v1.0</span><button onClick={() => setIsEditing((value) => !value)} className="flex items-center gap-1.5 rounded-lg border-2 border-ink bg-paper px-3 py-1.5 font-mono text-xs font-bold shadow-press">{isEditing ? <Eye className="h-3.5 w-3.5" /> : <Edit3 className="h-3.5 w-3.5" />}{isEditing ? "PREVIEW" : "EDIT DRAFT"}</button></div><div className="flex flex-wrap items-center justify-end gap-2">{provider ? <span className="font-mono text-[10px] text-ink-muted">ENGINE: {provider}</span> : null}<button onClick={downloadJSON} className="inline-flex items-center gap-2 rounded-lg border-2 border-ink bg-paper px-3 py-2 font-mono text-xs font-bold shadow-press"><FileJson className="h-3.5 w-3.5" />JSON</button><button onClick={handleExportPDF} disabled={downloading || !reviewConfirmed} className="inline-flex items-center gap-2 rounded-lg border-2 border-ink bg-terracotta px-5 py-2 font-mono text-xs font-bold uppercase text-paper shadow-press disabled:opacity-40"><Download className="h-3.5 w-3.5" />{downloading ? "GENERATING..." : "EXPORT REVIEWED PDF"}</button></div></div>
+    {exportError ? <div className="flex items-center gap-2 rounded-lg border-2 border-ink bg-red-50 p-3.5 font-mono text-xs text-red-800"><AlertCircle className="h-4 w-4" />{exportError}<button onClick={() => setExportError(null)} className="ml-auto"><X className="h-3.5 w-3.5" /></button></div> : null}
+    {notes.length ? <div className="rounded-xl border-2 border-ink bg-manila/70 p-4 shadow-press"><div className="mb-2 flex items-center gap-2 font-mono text-xs font-bold uppercase"><Sparkles className="h-4 w-4 text-terracotta" />AI tailoring notes</div><ul className="list-inside list-disc font-serif text-xs text-ink-muted">{notes.map((note, index) => <li key={index}>{note}</li>)}</ul></div> : null}
+    {isEditing ? <div className="space-y-5 rounded-xl border-2 border-ink bg-[#fffdf9] p-5 shadow-dossier">
+      <div><h3 className="font-serif text-lg font-bold">Human review</h3><p className="font-mono text-[10px] text-ink-muted">Edit the schema-backed fields below. PDF export remains locked until you confirm the final draft.</p></div>
+      <div className="grid gap-3 sm:grid-cols-2"><TextField label="Name" value={basics.name} onChange={(name) => updateBasics({ name })} /><TextField label="Target label" value={basics.label} onChange={(label) => updateBasics({ label })} /><TextField label="Email" value={basics.email} onChange={(email) => updateBasics({ email })} /><TextField label="Phone" value={basics.phone} onChange={(phone) => updateBasics({ phone })} /><TextField label="Location" value={basics.location?.address} onChange={(address) => updateBasics({ location: { ...basics.location, address } })} /><TextField label="Portfolio URL" value={basics.url} onChange={(url) => updateBasics({ url })} /></div>
+      <label className="space-y-1"><span className="font-mono text-[10px] font-bold uppercase text-ink-muted">Professional summary</span><textarea rows={4} className={inputClass} value={basics.summary || ""} onChange={(event) => updateBasics({ summary: event.target.value })} /></label>
+      {(resume.work || []).map((item, index) => <section key={index} className="space-y-3 rounded-lg border-2 border-ink/30 bg-manila/30 p-4"><h4 className="font-mono text-xs font-bold uppercase">Experience {index + 1}</h4><div className="grid gap-3 sm:grid-cols-2"><TextField label="Organization" value={item.name} onChange={(name) => onUpdateResume({ ...resume, work: resume.work?.map((entry, i) => i === index ? { ...entry, name } : entry) })} /><TextField label="Position" value={item.position} onChange={(position) => onUpdateResume({ ...resume, work: resume.work?.map((entry, i) => i === index ? { ...entry, position } : entry) })} /><TextField label="Location" value={item.location} onChange={(location) => onUpdateResume({ ...resume, work: resume.work?.map((entry, i) => i === index ? { ...entry, location } : entry) })} /><TextField label="Display date" value={item.custom?.wissenPress?.displayDate} onChange={(displayDate) => onUpdateResume({ ...resume, work: resume.work?.map((entry, i) => i === index ? { ...entry, custom: { ...entry.custom, wissenPress: { ...entry.custom?.wissenPress, displayDate } } } : entry) })} /></div><HighlightsEditor values={item.highlights} onChange={(highlights) => onUpdateResume({ ...resume, work: resume.work?.map((entry, i) => i === index ? { ...entry, highlights } : entry) })} /></section>)}
+      {(resume.projects || []).map((item, index) => <section key={index} className="space-y-3 rounded-lg border-2 border-ink/30 bg-manila/30 p-4"><h4 className="font-mono text-xs font-bold uppercase">Project {index + 1}</h4><div className="grid gap-3 sm:grid-cols-2"><TextField label="Project name" value={item.name} onChange={(name) => onUpdateResume({ ...resume, projects: resume.projects?.map((entry, i) => i === index ? { ...entry, name } : entry) })} /><TextField label="Display date" value={item.custom?.wissenPress?.displayDate} onChange={(displayDate) => onUpdateResume({ ...resume, projects: resume.projects?.map((entry, i) => i === index ? { ...entry, custom: { ...entry.custom, wissenPress: { ...entry.custom?.wissenPress, displayDate } } } : entry) })} /><TextField label="Technologies (comma-separated)" value={(item.keywords || []).join(", ")} onChange={(keywords) => onUpdateResume({ ...resume, projects: resume.projects?.map((entry, i) => i === index ? { ...entry, keywords: keywords.split(",").map((value) => value.trim()).filter(Boolean) } : entry) })} /><TextField label="Project URL" value={item.url} onChange={(url) => onUpdateResume({ ...resume, projects: resume.projects?.map((entry, i) => i === index ? { ...entry, url } : entry) })} /></div><label className="space-y-1"><span className="font-mono text-[10px] font-bold uppercase text-ink-muted">Summary</span><textarea rows={2} className={inputClass} value={item.summary || ""} onChange={(event) => onUpdateResume({ ...resume, projects: resume.projects?.map((entry, i) => i === index ? { ...entry, summary: event.target.value } : entry) })} /></label><HighlightsEditor values={item.highlights} onChange={(highlights) => onUpdateResume({ ...resume, projects: resume.projects?.map((entry, i) => i === index ? { ...entry, highlights } : entry) })} /></section>)}
+      {(resume.skills || []).map((item, index) => <section key={index} className="grid gap-3 rounded-lg border-2 border-ink/30 bg-manila/30 p-4 sm:grid-cols-2"><TextField label="Skill group" value={item.name} onChange={(name) => onUpdateResume({ ...resume, skills: resume.skills?.map((entry, i) => i === index ? { ...entry, name } : entry) })} /><TextField label="Keywords (comma-separated)" value={(item.keywords || []).join(", ")} onChange={(keywords) => onUpdateResume({ ...resume, skills: resume.skills?.map((entry, i) => i === index ? { ...entry, keywords: keywords.split(",").map((value) => value.trim()).filter(Boolean) } : entry) })} /></section>)}
+      {(resume.education || []).map((item, index) => <section key={index} className="grid gap-3 rounded-lg border-2 border-ink/30 bg-manila/30 p-4 sm:grid-cols-2"><TextField label="Institution" value={item.institution} onChange={(institution) => onUpdateResume({ ...resume, education: resume.education?.map((entry, i) => i === index ? { ...entry, institution } : entry) })} /><TextField label="Study type" value={item.studyType} onChange={(studyType) => onUpdateResume({ ...resume, education: resume.education?.map((entry, i) => i === index ? { ...entry, studyType } : entry) })} /><TextField label="Area" value={item.area} onChange={(area) => onUpdateResume({ ...resume, education: resume.education?.map((entry, i) => i === index ? { ...entry, area } : entry) })} /><TextField label="Score / details" value={item.score} onChange={(score) => onUpdateResume({ ...resume, education: resume.education?.map((entry, i) => i === index ? { ...entry, score } : entry) })} /><TextField label="Location" value={item.custom?.wissenPress?.location} onChange={(location) => onUpdateResume({ ...resume, education: resume.education?.map((entry, i) => i === index ? { ...entry, custom: { ...entry.custom, wissenPress: { ...entry.custom?.wissenPress, location } } } : entry) })} /><TextField label="Display date" value={item.custom?.wissenPress?.displayDate} onChange={(displayDate) => onUpdateResume({ ...resume, education: resume.education?.map((entry, i) => i === index ? { ...entry, custom: { ...entry.custom, wissenPress: { ...entry.custom?.wissenPress, displayDate } } } : entry) })} /></section>)}
+    </div> : <div className="overflow-hidden rounded-xl border-2 border-ink bg-white shadow-dossier"><ResumePdfViewer resume={resume} /></div>}
+    <label className="flex items-start gap-3 rounded-xl border-2 border-ink bg-[#fffdf9] p-4 font-mono text-xs shadow-press"><input type="checkbox" className="mt-0.5 h-4 w-4 accent-[#c84f32]" checked={reviewConfirmed} onChange={(event) => setReviewConfirmed(event.target.checked)} /><span><strong>I reviewed the generated JSON Resume.</strong><br /><span className="text-[10px] text-ink-muted">I verified the summary, organizations, projects, education and every bullet point. Enable final PDF export.</span></span></label>
+  </div></>;
 }

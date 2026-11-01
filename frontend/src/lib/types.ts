@@ -28,6 +28,7 @@ export interface ProjectItem {
   bullets?: string[];
   highlights?: string[];
   link?: string;
+  year?: string;
 }
 
 export interface EducationItem {
@@ -35,19 +36,100 @@ export interface EducationItem {
   degree: string;
   year: string;
   details?: string;
+  location?: string;
+}
+
+export interface JSONResumeCustomData {
+  wissenPress?: {
+    displayDate?: string;
+    location?: string;
+    tailoredMatchNotes?: string[];
+    aiProvider?: string;
+    groundingValidation?: Record<string, unknown>;
+  };
+  [key: string]: unknown;
+}
+
+export interface JSONResumeBasics {
+  name?: string;
+  label?: string;
+  image?: string;
+  email?: string;
+  phone?: string;
+  url?: string;
+  summary?: string;
+  location?: {
+    address?: string;
+    postalCode?: string;
+    city?: string;
+    countryCode?: string;
+    region?: string;
+  };
+  profiles?: Array<{ network?: string; username?: string; url?: string }>;
+}
+
+export interface JSONResumeWork {
+  name?: string;
+  position?: string;
+  location?: string;
+  description?: string;
+  url?: string;
+  startDate?: string;
+  endDate?: string;
+  summary?: string;
+  highlights?: string[];
+  keywords?: string[];
+  custom?: JSONResumeCustomData;
+}
+
+export interface JSONResumeProject {
+  name?: string;
+  summary?: string;
+  highlights?: string[];
+  keywords?: string[];
+  startDate?: string;
+  endDate?: string;
+  url?: string;
+  roles?: string[];
+  entity?: string;
+  type?: string;
+  custom?: JSONResumeCustomData;
+}
+
+export interface JSONResumeEducation {
+  institution?: string;
+  url?: string;
+  area?: string;
+  studyType?: string;
+  startDate?: string;
+  endDate?: string;
+  score?: string;
+  courses?: string[];
+  summary?: string;
+  custom?: JSONResumeCustomData;
+}
+
+export interface JSONResumeSkill {
+  name?: string;
+  level?: string;
+  keywords?: string[];
 }
 
 export interface ResumeData {
-  name: string;
-  title: string;
-  contact: ContactInfo;
-  summary: string;
-  skills: SkillCategory[];
-  experience: ExperienceItem[];
-  projects: ProjectItem[];
-  education: EducationItem[];
-  tailored_match_notes?: string[];
-  _ai_provider?: string;
+  basics?: JSONResumeBasics;
+  work?: JSONResumeWork[];
+  education?: JSONResumeEducation[];
+  skills?: JSONResumeSkill[];
+  projects?: JSONResumeProject[];
+  volunteer?: unknown[];
+  awards?: unknown[];
+  certificates?: unknown[];
+  publications?: unknown[];
+  languages?: unknown[];
+  interests?: unknown[];
+  references?: unknown[];
+  meta?: { canonical?: string; version?: string; lastModified?: string; theme?: string };
+  custom?: JSONResumeCustomData;
 }
 
 export interface RAGItem {
@@ -62,6 +144,14 @@ export interface RAGContext {
   match_count: number;
   retrieved_items: RAGItem[];
   keywords: string[];
+  expanded_concepts?: string[];
+  context_metrics?: {
+    characters: number;
+    approximate_tokens: number;
+    source_sections_available: number;
+    source_sections_included: number;
+    max_characters: number;
+  };
 }
 
 export interface TailorResponse {
@@ -89,14 +179,23 @@ export interface CandidateProfileResponse {
 }
 
 export interface OllamaStatus {
+  enabled?: boolean;
   online: boolean;
   models: string[];
   url: string;
 }
 
+export interface CloudProviderStatus {
+  configured: boolean;
+  online: boolean;
+  models: string[];
+}
+
 export interface HealthResponse {
   status: string;
+  api_revision?: string;
   ollama: OllamaStatus;
+  groq?: CloudProviderStatus;
   knowledge_base: KnowledgeBaseStats;
 }
 

@@ -233,7 +233,7 @@ export default function ConnectorsHub({ onRefreshStats }: ConnectorsHubProps) {
         text: `Generated ${res.generated_count ?? res.count} examples: ${res.count} training and ${res.holdout_count ?? 0} holdout.`,
         isError: false,
       });
-      const downloadUrl = `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001"}${res.download_url}`;
+      const downloadUrl = `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8002"}${res.download_url}`;
       window.open(downloadUrl, "_blank");
     } catch (err: any) {
       setStatusMessage({ text: err.message || "Failed to export dataset", isError: true });
@@ -905,7 +905,7 @@ export default function ConnectorsHub({ onRefreshStats }: ConnectorsHubProps) {
                     <span>{exportResult.count} training / {exportResult.holdout_count ?? 0} holdout ({(exportResult.file_size_bytes / 1024).toFixed(1)} KB training)</span>
                     <div className="flex items-center gap-3">
                       <a
-                        href={`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001"}${exportResult.download_url}`}
+                        href={`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8002"}${exportResult.download_url}`}
                         download="training_data.jsonl"
                         className="underline font-bold hover:text-emerald-950 flex items-center gap-1"
                       >
@@ -913,7 +913,7 @@ export default function ConnectorsHub({ onRefreshStats }: ConnectorsHubProps) {
                       </a>
                       {exportResult.holdout_download_url && (
                         <a
-                          href={`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001"}${exportResult.holdout_download_url}`}
+                          href={`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8002"}${exportResult.holdout_download_url}`}
                           download="holdout_eval.jsonl"
                           className="underline font-bold hover:text-emerald-950 flex items-center gap-1"
                         >

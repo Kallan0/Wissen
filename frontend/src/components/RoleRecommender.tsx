@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import { Compass, Sparkles, CheckCircle2, ArrowRight, Target, Lightbulb, AlertCircle, Stamp, ScrollText } from "lucide-react";
 import EmptyKBBanner from "@/components/EmptyKBBanner";
 import ProfileQuestionnaireModal from "@/components/ProfileQuestionnaireModal";
-import { fetchCareerRecommendations, fetchKBProfile } from "@/lib/api";
+import { fetchCareerRecommendations, fetchKBProfile, formatModelLabel, isCloudModel } from "@/lib/api";
 import { CareerRecommendationsResponse, RecommendedPosition } from "@/lib/types";
 
 interface RoleRecommenderProps {
@@ -87,7 +87,7 @@ export default function RoleRecommender({
               AI Career Matcher & Opportunity Dispatch
             </h2>
             <p className="text-xs sm:text-sm font-serif italic text-ink-muted mt-1 max-w-2xl leading-relaxed">
-              The local Ollama AI scans your ChromaDB vector database (verified career history, projects, and skills) to identify the highest-fit positions you can target right now.
+              Choose local Ollama or Groq Cloud to analyze your verified ChromaDB career history and identify the highest-fit positions you can target right now.
             </p>
           </div>
 
@@ -99,10 +99,15 @@ export default function RoleRecommender({
             >
               {models.map((m) => (
                 <option key={m} value={m}>
-                  {m} (Active)
+                  {formatModelLabel(m)}
                 </option>
               ))}
             </select>
+            {isCloudModel(selectedModel) && (
+              <span className="font-mono text-[10px] text-terracotta">
+                CLOUD: verified profile context is sent to Groq
+              </span>
+            )}
 
             <button
               onClick={handleAnalyze}
@@ -231,7 +236,7 @@ export default function RoleRecommender({
             <ScrollText className="w-12 h-12 text-ink-muted/40 mx-auto mb-3" />
             <h3 className="text-lg font-serif font-bold text-ink">Awaiting Archive Analysis</h3>
             <p className="font-serif italic text-xs text-ink-muted max-w-md mx-auto mt-1 mb-5">
-              Press <strong>"DISPATCH ROLE MATCHES"</strong> above. The local Ollama LLM will synthesize vector embeddings from your ChromaDB ledger to produce tailored position recommendations.
+              Press <strong>"DISPATCH ROLE MATCHES"</strong> above. The selected inference engine will use your retrieved ChromaDB ledger to produce tailored position recommendations.
             </p>
             <button
               onClick={handleAnalyze}

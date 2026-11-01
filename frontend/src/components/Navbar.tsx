@@ -189,7 +189,9 @@ export default function Navbar({
                   }`}
               />
               <span>
-                {isOllamaUp
+                {health?.ollama?.enabled === false
+                  ? "Ollama: Disabled"
+                  : isOllamaUp
                   ? health?.ollama?.models && health.ollama.models.length > 0
                     ? `Ollama: ${health.ollama.models[0].split(":")[0]}`
                     : "Ollama: Active"
@@ -206,6 +208,15 @@ export default function Navbar({
               <RefreshCw className={`w-3 h-3 ${isLoading ? "animate-spin text-terracotta" : ""}`} />
             </button>
           </div>
+          {health?.groq?.configured && (
+            <div className="flex items-center justify-between border-t border-ink/10 pt-2 font-mono text-[10px] text-ink-muted">
+              <span className="flex items-center gap-1.5">
+                <span className={`h-2 w-2 rounded-full ${health.groq.online ? "bg-fountain-teal" : "bg-vintage-gold"}`} />
+                Groq Cloud
+              </span>
+              <span>{health.groq.online ? "READY" : "UNAVAILABLE"}</span>
+            </div>
+          )}
         </div>
       </aside>
     </>

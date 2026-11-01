@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Wissen Press | Local AI Resume Tailor",
-  description: "Tactile editorial papercraft resume builder powered by local ChromaDB vector RAG and local Ollama models.",
+  description: "Tactile editorial resume builder with local ChromaDB RAG and selectable Ollama or Groq inference.",
 };
 
 export default function RootLayout({
