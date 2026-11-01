@@ -4,7 +4,7 @@
   "description": "Local AI-Powered Privacy-First Resume Builder",
   "private": true,
   "scripts": {
-    "dev:backend": "backend\\venv\\Scripts\\python.exe -m uvicorn main:app --reload --port 8001 --app-dir backend",
+    "dev:backend": "node scripts/start-backend.js",
     "dev:frontend": "npm --prefix frontend run dev",
     "dev:ollama": "ollama serve",
     "dev": "node scripts/dev.js",
